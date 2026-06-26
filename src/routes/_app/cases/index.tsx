@@ -4,6 +4,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { AxiosError } from 'axios'
 import { Briefcase, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useUser } from '@/contexts/user'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -272,20 +273,24 @@ function CasesPage() {
   const { page } = Route.useSearch()
   const navigate = useNavigate()
 
+  const { userInfo } = useUser()
+
   const { data, isLoading } = useQuery({
     queryKey: ['cases', page],
     queryFn: () => getCases(page),
+    // cases endpoint already scopes CLIENT on backend, keep enabled
   })
 
   // Used both for the client selector and to resolve client_id -> name.
   const { data: clientsData } = useQuery({
     queryKey: ['clients', 1],
     queryFn: () => getClients(1),
+    enabled: userInfo?.role === 'ADMIN',
   })
 
   const cases = data?.results ?? []
   const meta = data?.meta
-  const clients = clientsData?.results ?? []
+  const clients = userInfo?.role === 'CLIENT' ? [] : clientsData?.results ?? []
   const clientNameById = new Map(clients.map((c) => [c.id, c.name]))
 
   function openCreate() {
@@ -308,10 +313,12 @@ function CasesPage() {
             Acompanhe os casos jurídicos vinculados aos clientes.
           </p>
         </div>
-        <Button size="sm" onClick={openCreate} className="w-full sm:w-auto">
-          <Plus className="size-3.5" />
-          Novo caso
-        </Button>
+        {userInfo?.role === 'ADMIN' && (
+          <Button size="sm" onClick={openCreate} className="w-full sm:w-auto">
+            <Plus className="size-3.5" />
+            Novo caso
+          </Button>
+        )}
       </div>
 
       {/* Cases table */}
@@ -362,16 +369,20 @@ function CasesPage() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEdit(caseItem)} title="Editar caso">
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon-sm"
-                          onClick={() => setDeletingCase(caseItem)} title="Remover caso"
-                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
+                        {userInfo?.role === 'ADMIN' && (
+                          <>
+                            <Button variant="ghost" size="icon-sm" onClick={() => openEdit(caseItem)} title="Editar caso">
+                              <Pencil className="size-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon-sm"
+                              onClick={() => setDeletingCase(caseItem)} title="Remover caso"
+                              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -392,18 +403,22 @@ function CasesPage() {
                       <StatusBadge status={caseItem.status} />
                     </div>
                   </div>
-                  <div className="flex shrink-0 gap-1">
-                    <Button variant="ghost" size="icon-sm" onClick={() => openEdit(caseItem)} title="Editar caso">
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost" size="icon-sm"
-                      onClick={() => setDeletingCase(caseItem)} title="Remover caso"
-                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
+                    <div className="flex shrink-0 gap-1">
+                      {userInfo?.role !== 'CLIENT' && (
+                        <>
+                          <Button variant="ghost" size="icon-sm" onClick={() => openEdit(caseItem)} title="Editar caso">
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon-sm"
+                            onClick={() => setDeletingCase(caseItem)} title="Remover caso"
+                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                 </div>
               ))}
             </div>

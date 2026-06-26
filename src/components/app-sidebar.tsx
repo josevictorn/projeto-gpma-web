@@ -137,6 +137,14 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const { userInfo } = useUser()
   const isAdmin = userInfo?.role === 'ADMIN'
 
+  const filteredMainNav = mainNavItems.filter((item) => {
+    if (userInfo?.role === 'CLIENT' || userInfo?.role === 'LAWYER') {
+      // clients and leads are not available for CLIENT or LAWYER users
+      return item.to !== '/leads' && item.to !== '/clients'
+    }
+    return true
+  })
+
   return (
     <aside
       className={cn(
@@ -150,7 +158,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
         <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
           Principal
         </p>
-        {mainNavItems.map((item) => (
+        {filteredMainNav.map((item) => (
           <NavLink key={item.to} item={item} onNavigate={onClose} />
         ))}
 

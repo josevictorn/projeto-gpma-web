@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { getCases } from '@/api/get-cases'
 import { getClients } from '@/api/get-clients'
 import { getLeads } from '@/api/get-leads'
+import { useUser } from '@/contexts/user'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
@@ -80,8 +81,10 @@ function DashboardPage() {
     }
   }, [unauthorized])
 
-  const { data: leadsData } = useQuery({ queryKey: ['leads', 1], queryFn: () => getLeads(1) })
-  const { data: clientsData } = useQuery({ queryKey: ['clients', 1], queryFn: () => getClients(1) })
+  const { userInfo } = useUser()
+
+  const { data: leadsData } = useQuery({ queryKey: ['leads', 1], queryFn: () => getLeads(1), enabled: userInfo?.role !== 'CLIENT' })
+  const { data: clientsData } = useQuery({ queryKey: ['clients', 1], queryFn: () => getClients(1), enabled: userInfo?.role !== 'CLIENT' })
   const { data: casesData, isLoading: loadingCases } = useQuery({
     queryKey: ['cases', 1],
     queryFn: () => getCases(1),
@@ -134,12 +137,42 @@ function DashboardPage() {
     },
   ]
 
+  const visibleMetrics = (userInfo?.role === 'CLIENT' || userInfo?.role === 'LAWYER')
+    ? metrics.filter((m) => m.label === 'Casos' || m.label === 'Audiências Hoje')
+    : metrics
+
   const today = new Date().toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   })
+  // If logged user is a CLIENT, show upcoming hearings only for their cases
+  // If logged user is a LAWYER, show upcoming hearings only for cases assigned to them
+  const displayedHearings = userInfo?.role === 'CLIENT'
+    ? (casesData?.results ?? []).slice(0, 5).map((c) => ({
+        id: c.id,
+        process: `Caso: ${c.title}`,
+        client: userInfo.name,
+        time: new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        date: new Date(c.created_at).toLocaleDateString('pt-BR'),
+        location: 'Tribunal (não integrado)',
+        urgent: false,
+      }))
+    : userInfo?.role === 'LAWYER'
+    ? (casesData?.results ?? [])
+        .filter((c) => c.assigned_lawyer_id === userInfo.id)
+        .slice(0, 5)
+        .map((c) => ({
+          id: c.id,
+          process: `Caso: ${c.title}`,
+          client: clientNameById.get(c.client_id) ?? '—',
+          time: new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          date: new Date(c.created_at).toLocaleDateString('pt-BR'),
+          location: 'Tribunal (não integrado)',
+          urgent: false,
+        }))
+    : upcomingHearings
 
   return (
     <div className="p-6 space-y-6">
@@ -151,7 +184,7 @@ function DashboardPage() {
 
       {/* Metric cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => {
+        {visibleMetrics.map((metric) => {
           const Icon = metric.icon
           return (
             <Card key={metric.label} className="relative overflow-hidden">
@@ -266,40 +299,46 @@ function DashboardPage() {
           </CardHeader>
           <Separator />
           <CardContent className="p-4 space-y-3">
-            {upcomingHearings.map((hearing) => (
-              <div
-                key={hearing.id}
-                className={`rounded-lg border p-3.5 transition-colors hover:bg-muted/30 ${hearing.urgent ? 'border-amber-500/30 bg-amber-500/5' : 'border-border'}`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <p className="text-xs font-medium leading-tight line-clamp-1">
-                    {hearing.client}
-                  </p>
-                  {hearing.urgent ? (
-                    <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                      Hoje
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {hearing.date}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[10px] font-mono text-muted-foreground mb-2 line-clamp-1">
-                  {hearing.process}
-                </p>
-                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Clock className="size-3" />
-                    {hearing.time}
-                  </span>
-                  <span className="flex items-center gap-1 line-clamp-1">
-                    <MapPin className="size-3 shrink-0" />
-                    <span className="truncate">{hearing.location}</span>
-                  </span>
-                </div>
+            {displayedHearings.length === 0 ? (
+              <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                Sem audiências marcadas.
               </div>
-            ))}
+            ) : (
+              displayedHearings.map((hearing) => (
+                <div
+                  key={hearing.id}
+                  className={`rounded-lg border p-3.5 transition-colors hover:bg-muted/30 ${hearing.urgent ? 'border-amber-500/30 bg-amber-500/5' : 'border-border'}`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-xs font-medium leading-tight line-clamp-1">
+                      {hearing.client}
+                    </p>
+                    {hearing.urgent ? (
+                      <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                        Hoje
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {hearing.date}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-mono text-muted-foreground mb-2 line-clamp-1">
+                    {hearing.process}
+                  </p>
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="size-3" />
+                      {hearing.time}
+                    </span>
+                    <span className="flex items-center gap-1 line-clamp-1">
+                      <MapPin className="size-3 shrink-0" />
+                      <span className="truncate">{hearing.location}</span>
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
