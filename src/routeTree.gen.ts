@@ -20,6 +20,7 @@ import { Route as AppLeadsIndexRouteImport } from './routes/_app/leads/index'
 import { Route as AppDashboardIndexRouteImport } from './routes/_app/dashboard/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppCasesIndexRouteImport } from './routes/_app/cases/index'
+import { Route as AppCasesCaseIdRouteImport } from './routes/_app/cases/$caseId'
 
 const AuthLayoutRoute = AuthLayoutRouteImport.update({
   id: '/_auth',
@@ -74,9 +75,15 @@ const AppCasesIndexRoute = AppCasesIndexRouteImport.update({
   path: '/cases/',
   getParentRoute: () => AppLayoutRoute,
 } as any)
+const AppCasesCaseIdRoute = AppCasesCaseIdRouteImport.update({
+  id: '/cases/$caseId',
+  path: '/cases/$caseId',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cases/$caseId': typeof AppCasesCaseIdRoute
   '/cases/': typeof AppCasesIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/dashboard/': typeof AppDashboardIndexRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cases/$caseId': typeof AppCasesCaseIdRoute
   '/cases': typeof AppCasesIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/dashboard': typeof AppDashboardIndexRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppLayoutRouteWithChildren
   '/_auth': typeof AuthLayoutRouteWithChildren
+  '/_app/cases/$caseId': typeof AppCasesCaseIdRoute
   '/_app/cases/': typeof AppCasesIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/dashboard/': typeof AppDashboardIndexRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cases/$caseId'
     | '/cases/'
     | '/clients/'
     | '/dashboard/'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/cases/$caseId'
     | '/cases'
     | '/clients'
     | '/dashboard'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/_auth'
+    | '/_app/cases/$caseId'
     | '/_app/cases/'
     | '/_app/clients/'
     | '/_app/dashboard/'
@@ -234,10 +246,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCasesIndexRouteImport
       parentRoute: typeof AppLayoutRoute
     }
+    '/_app/cases/$caseId': {
+      id: '/_app/cases/$caseId'
+      path: '/cases/$caseId'
+      fullPath: '/cases/$caseId'
+      preLoaderRoute: typeof AppCasesCaseIdRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
   }
 }
 
 interface AppLayoutRouteChildren {
+  AppCasesCaseIdRoute: typeof AppCasesCaseIdRoute
   AppCasesIndexRoute: typeof AppCasesIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppDashboardIndexRoute: typeof AppDashboardIndexRoute
@@ -246,6 +266,7 @@ interface AppLayoutRouteChildren {
 }
 
 const AppLayoutRouteChildren: AppLayoutRouteChildren = {
+  AppCasesCaseIdRoute: AppCasesCaseIdRoute,
   AppCasesIndexRoute: AppCasesIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppDashboardIndexRoute: AppDashboardIndexRoute,
