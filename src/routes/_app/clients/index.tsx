@@ -1,14 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUser } from '@/contexts/user'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2, UserSquare2 } from 'lucide-react'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { ChevronLeft, ChevronRight, History, Pencil, Plus, Trash2, UserSquare2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { createClient } from '@/api/create-client'
 import { deleteClient } from '@/api/delete-client'
+import { getClientHistory } from '@/api/get-client-history'
 import { getClients } from '@/api/get-clients'
 import { updateClient } from '@/api/update-client'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { getErrorMessage } from '@/lib/get-error-message'
+import { StatusBadge } from '@/routes/_app/cases/-case-status'
 
 export const Route = createFileRoute('/_app/clients/')({
   component: ClientsPage,
@@ -271,11 +273,68 @@ function DeleteClientDialog({ client, open, onClose }: DeleteClientDialogProps) 
   )
 }
 
+// ── Client history dialog (issue #21) ────────────────────────────────────────
+
+function ClientHistoryDialog({
+  client,
+  open,
+  onClose,
+}: {
+  client: Client | null
+  open: boolean
+  onClose: () => void
+}) {
+  const { data: history, isLoading } = useQuery({
+    queryKey: ['client-history', client?.id],
+    queryFn: () => getClientHistory(client!.id),
+    enabled: open && !!client,
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Histórico de {client?.name}</DialogTitle>
+          <DialogDescription>Processos vinculados a este cliente, do mais recente ao mais antigo.</DialogDescription>
+        </DialogHeader>
+        {isLoading ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Carregando histórico...</p>
+        ) : !history || history.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado.</p>
+        ) : (
+          <ul className="max-h-[60vh] divide-y divide-border/40 overflow-y-auto">
+            {history.map((item) => (
+              <li key={item.id}>
+                <Link
+                  to="/cases/$caseId"
+                  params={{ caseId: item.id }}
+                  onClick={onClose}
+                  className="flex items-start justify-between gap-3 py-3 transition-colors hover:bg-muted/30"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{item.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                  <StatusBadge status={item.status} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 function ClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [deletingClient, setDeletingClient] = useState<Client | null>(null)
+  const [historyClient, setHistoryClient] = useState<Client | null>(null)
   const [formOpen, setFormOpen] = useState(false)
 
   const { page } = Route.useSearch()
@@ -382,6 +441,9 @@ function ClientsPage() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setHistoryClient(client)} title="Histórico do cliente">
+                          <History className="size-3.5" />
+                        </Button>
                         <Button variant="ghost" size="icon-sm" onClick={() => openEdit(client)} title="Editar cliente">
                           <Pencil className="size-3.5" />
                         </Button>
@@ -411,6 +473,9 @@ function ClientsPage() {
                     <p className="text-xs text-muted-foreground truncate">{client.email}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="icon-sm" onClick={() => setHistoryClient(client)} title="Histórico do cliente">
+                      <History className="size-3.5" />
+                    </Button>
                     <Button variant="ghost" size="icon-sm" onClick={() => openEdit(client)} title="Editar cliente">
                       <Pencil className="size-3.5" />
                     </Button>
@@ -459,6 +524,7 @@ function ClientsPage() {
 
       <ClientFormDialog client={editingClient} open={formOpen} onClose={() => setFormOpen(false)} />
       <DeleteClientDialog client={deletingClient} open={!!deletingClient} onClose={() => setDeletingClient(null)} />
+      <ClientHistoryDialog client={historyClient} open={!!historyClient} onClose={() => setHistoryClient(null)} />
     </div>
   )
 }
