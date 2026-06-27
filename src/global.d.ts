@@ -65,6 +65,30 @@ declare global {
     description: string
     status: CaseStatus
     client_id: string
+    // Not yet returned by the documented backend; optional so the dashboard's
+    // "cases assigned to lawyer" filter compiles and works once it's exposed.
+    assigned_lawyer_id?: string | null
+    created_at: string
+    updated_at: string
+  }
+
+  // A movement/update registered against a case (issue #25).
+  interface CaseUpdate {
+    id: string
+    case_id: string
+    date: string
+    type: string
+    description: string
+    created_at: string
+    updated_at: string
+  }
+
+  // A case as returned in a client's history (issue #21). No client_id field.
+  interface ClientHistoryEntry {
+    id: string
+    title: string
+    description: string
+    status: CaseStatus
     created_at: string
     updated_at: string
   }
