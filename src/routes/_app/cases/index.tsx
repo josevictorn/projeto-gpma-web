@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import type { AxiosError } from 'axios'
 import { Briefcase, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -10,10 +10,11 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { createCase } from '@/api/create-case'
 import { deleteCase } from '@/api/delete-case'
+import { getAllClients } from '@/api/get-all-clients'
 import { getCases } from '@/api/get-cases'
-import { getClients } from '@/api/get-clients'
 import { updateCase } from '@/api/update-case'
 import { Button } from '@/components/ui/button'
+import { Combobox } from '@/components/ui/combobox'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { getErrorMessage } from '@/lib/get-error-message'
+import { CaseStatusControl, statusConfig, statusOrder } from './-case-status'
 
 export const Route = createFileRoute('/_app/cases/')({
   component: CasesPage,
@@ -39,32 +41,6 @@ export const Route = createFileRoute('/_app/cases/')({
     page: z.number().int().min(1).catch(1),
   }),
 })
-
-const statusConfig: Record<CaseStatus, { label: string; className: string }> = {
-  OPEN: {
-    label: 'Aberto',
-    className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  },
-  PENDING: {
-    label: 'Pendente',
-    className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  },
-  CLOSED: {
-    label: 'Encerrado',
-    className: 'bg-muted text-muted-foreground border-border',
-  },
-}
-
-const statusOrder: CaseStatus[] = ['OPEN', 'PENDING', 'CLOSED']
-
-function StatusBadge({ status }: { status: CaseStatus }) {
-  const config = statusConfig[status]
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${config.className}`}>
-      {config.label}
-    </span>
-  )
-}
 
 // ── Case form dialog (create / edit) ─────────────────────────────────────────
 
@@ -164,18 +140,15 @@ function CaseFormDialog({ caseItem, clients, open, onClose }: CaseFormDialogProp
               name="clientId"
               control={control}
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={clients.map((client) => ({ value: client.id, label: client.name }))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={clients.length === 0}
+                  placeholder="Selecione um cliente"
+                  searchPlaceholder="Buscar cliente..."
+                  emptyText="Nenhum cliente encontrado."
+                />
               )}
             />
             {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
@@ -281,17 +254,18 @@ function CasesPage() {
     // cases endpoint already scopes CLIENT on backend, keep enabled
   })
 
-  // Used both for the client selector and to resolve client_id -> name.
+  // Used both for the client selector (searchable) and to resolve client_id -> name.
   const { data: clientsData } = useQuery({
-    queryKey: ['clients', 1],
-    queryFn: () => getClients(1),
+    queryKey: ['clients', 'all'],
+    queryFn: getAllClients,
     enabled: userInfo?.role === 'ADMIN',
   })
 
   const cases = data?.results ?? []
   const meta = data?.meta
-  const clients = userInfo?.role === 'CLIENT' ? [] : clientsData?.results ?? []
-  const clientNameById = new Map(clients.map((c) => [c.id, c.name]))
+  const clients = userInfo?.role === 'CLIENT' ? [] : clientsData ?? []
+  const clientNameById = new Map(clients.map((client) => [client.id, client.name]))
+  const canManage = userInfo?.role === 'ADMIN'
 
   function openCreate() {
     setEditingCase(null)
@@ -359,11 +333,21 @@ function CasesPage() {
                     key={caseItem.id}
                     className={`transition-colors hover:bg-muted/30 ${i < cases.length - 1 ? 'border-b border-border/40' : ''}`}
                   >
-                    <td className="px-5 py-3.5 font-medium">{caseItem.title}</td>
+                    <td className="px-5 py-3.5 font-medium">
+                      <Link
+                        to="/cases/$caseId"
+                        params={{ caseId: caseItem.id }}
+                        className="hover:text-primary hover:underline"
+                      >
+                        {caseItem.title}
+                      </Link>
+                    </td>
                     <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
                       {clientNameById.get(caseItem.client_id) ?? '—'}
                     </td>
-                    <td className="px-5 py-3.5"><StatusBadge status={caseItem.status} /></td>
+                    <td className="px-5 py-3.5">
+                      <CaseStatusControl caseItem={caseItem} canEdit={canManage} />
+                    </td>
                     <td className="px-5 py-3.5 text-xs text-muted-foreground hidden lg:table-cell">
                       {new Date(caseItem.created_at).toLocaleDateString('pt-BR')}
                     </td>
@@ -395,12 +379,18 @@ function CasesPage() {
               {cases.map((caseItem) => (
                 <div key={caseItem.id} className="flex items-center gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{caseItem.title}</p>
+                    <Link
+                      to="/cases/$caseId"
+                      params={{ caseId: caseItem.id }}
+                      className="block text-sm font-medium truncate hover:text-primary hover:underline"
+                    >
+                      {caseItem.title}
+                    </Link>
                     <p className="text-xs text-muted-foreground truncate">
                       {clientNameById.get(caseItem.client_id) ?? '—'}
                     </p>
                     <div className="mt-1">
-                      <StatusBadge status={caseItem.status} />
+                      <CaseStatusControl caseItem={caseItem} canEdit={canManage} />
                     </div>
                   </div>
                     <div className="flex shrink-0 gap-1">
