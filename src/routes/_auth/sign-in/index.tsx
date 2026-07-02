@@ -1,6 +1,7 @@
+import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { Eclipse } from 'lucide-react'
+import { Eclipse, Eye, EyeOff } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -53,6 +54,12 @@ function RouteComponent() {
     navigate({ to: '/dashboard' })
   }
 
+  const [showPassword, setShowPassword] = React.useState(false)
+
+  function toggleShowPassword() {
+    setShowPassword((v) => !v)
+  }
+
   return (
     <div>
       <div className="mx-4 flex max-w-87 flex-col justify-center gap-6">
@@ -93,12 +100,26 @@ function RouteComponent() {
                   Esqueceu sua senha?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                {...register('password')}
-                aria-invalid={!!errors.password}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  {...register('password')}
+                  aria-invalid={!!errors.password}
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  onClick={toggleShowPassword}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
               {errors.password && <FieldError errors={[errors.password]} />}
             </Field>
           </FieldGroup>
