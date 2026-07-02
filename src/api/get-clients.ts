@@ -5,7 +5,8 @@ export interface GetClientsResponse {
   meta: PaginationMeta
 }
 
-export async function getClients(page = 1) {
-  const response = await api.get<GetClientsResponse>('/clients', { params: { page } })
+export async function getClients(page = 1, search?: string) {
+  const params = search ? { page, search } : { page }
+  const response = await api.get<GetClientsResponse>('/clients', { params })
   return response.data
 }

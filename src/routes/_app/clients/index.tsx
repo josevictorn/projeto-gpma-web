@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUser } from '@/contexts/user'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { ChevronLeft, ChevronRight, History, Pencil, Plus, Trash2, UserSquare2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, History, Pencil, Plus, Search, Trash2, UserSquare2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -30,6 +30,7 @@ export const Route = createFileRoute('/_app/clients/')({
   component: ClientsPage,
   validateSearch: z.object({
     page: z.number().int().min(1).catch(1),
+    search: z.string().optional(),
   }),
 })
 
@@ -337,14 +338,19 @@ function ClientsPage() {
   const [historyClient, setHistoryClient] = useState<Client | null>(null)
   const [formOpen, setFormOpen] = useState(false)
 
-  const { page } = Route.useSearch()
+  const { page, search } = Route.useSearch()
   const navigate = useNavigate()
 
   const { userInfo } = useUser()
+  const [searchTerm, setSearchTerm] = useState(search ?? '')
+
+  useEffect(() => {
+    setSearchTerm(search ?? '')
+  }, [search])
 
   const { data, isLoading } = useQuery({
-    queryKey: ['clients', page],
-    queryFn: () => getClients(page),
+    queryKey: ['clients', page, search],
+    queryFn: () => getClients(page, search),
     enabled: userInfo?.role === 'ADMIN',
   })
 
@@ -381,10 +387,64 @@ function ClientsPage() {
           </p>
         </div>
         {userInfo?.role === 'ADMIN' && (
-          <Button size="sm" onClick={openCreate} className="w-full sm:w-auto">
-          <Plus className="size-3.5" />
-          Novo cliente
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex w-full items-center gap-2 sm:w-[320px]">
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Buscar cliente por nome ou CPF"
+                className="w-full"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    navigate({
+                      to: '/clients',
+                      search: {
+                        page: 1,
+                        search: searchTerm.trim() || undefined,
+                      },
+                    })
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate({
+                  to: '/clients',
+                  search: {
+                    page: 1,
+                    search: searchTerm.trim() || undefined,
+                  },
+                })}
+                className="whitespace-nowrap"
+              >
+                <Search className="size-3.5 mr-2" />
+                Buscar
+              </Button>
+            </div>
+            <div className="flex gap-2 sm:justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm('')
+                  navigate({ to: '/clients', search: { page: 1 } })
+                }}
+                className="w-full sm:w-auto"
+              >
+                Limpar
+              </Button>
+              <Button
+                size="sm"
+                onClick={openCreate}
+                className="w-full sm:w-auto"
+              >
+                <Plus className="size-3.5" />
+                Novo cliente
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
