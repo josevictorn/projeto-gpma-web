@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUser } from '@/contexts/user'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -35,6 +35,7 @@ export const Route = createFileRoute('/_app/leads/')({
   component: LeadsPage,
   validateSearch: z.object({
     page: z.number().int().min(1).catch(1),
+    search: z.string().optional(),
   }),
 })
 
@@ -234,14 +235,19 @@ function LeadsPage() {
   const [deletingLead, setDeletingLead] = useState<Lead | null>(null)
   const [formOpen, setFormOpen] = useState(false)
 
-  const { page } = Route.useSearch()
+  const { page, search } = Route.useSearch()
   const navigate = useNavigate()
 
   const { userInfo } = useUser()
+  const [searchTerm, setSearchTerm] = useState(search ?? '')
+
+  useEffect(() => {
+    setSearchTerm(search ?? '')
+  }, [search])
 
   const { data, isLoading } = useQuery({
-    queryKey: ['leads', page],
-    queryFn: () => getLeads(page),
+    queryKey: ['leads', page, search],
+    queryFn: () => getLeads(page, search),
     enabled: userInfo?.role === 'ADMIN',
   })
 
@@ -278,10 +284,64 @@ function LeadsPage() {
           </p>
         </div>
         {userInfo?.role === 'ADMIN' && (
-          <Button size="sm" onClick={openCreate} className="w-full sm:w-auto">
-          <Plus className="size-3.5" />
-          Novo lead
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex w-full items-center gap-2 sm:w-[320px]">
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Buscar lead por nome"
+                className="w-full"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    navigate({
+                      to: '/leads',
+                      search: {
+                        page: 1,
+                        search: searchTerm.trim() || undefined,
+                      },
+                    })
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate({
+                  to: '/leads',
+                  search: {
+                    page: 1,
+                    search: searchTerm.trim() || undefined,
+                  },
+                })}
+                className="whitespace-nowrap"
+              >
+                <Search className="size-3.5 mr-2" />
+                Buscar
+              </Button>
+            </div>
+            <div className="flex gap-2 sm:justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm('')
+                  navigate({ to: '/leads', search: { page: 1 } })
+                }}
+                className="w-full sm:w-auto"
+              >
+                Limpar
+              </Button>
+              <Button
+                size="sm"
+                onClick={openCreate}
+                className="w-full sm:w-auto"
+              >
+                <Plus className="size-3.5" />
+                Novo lead
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
