@@ -83,6 +83,17 @@ declare global {
     updated_at: string
   }
 
+  // A payment method (issue: cadastro de formas de pagamento). The write body is
+  // camelCase (isActive), but the API returns snake_case (is_active).
+  interface PaymentMethod {
+    id: string
+    name: string
+    description: string | null
+    is_active: boolean
+    created_at: string
+    updated_at: string
+  }
+
   // A case as returned in a client's history (issue #21). No client_id field.
   interface ClientHistoryEntry {
     id: string
