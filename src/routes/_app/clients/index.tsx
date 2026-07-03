@@ -296,7 +296,7 @@ function ClientHistoryDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Histórico de {client?.name}</DialogTitle>
-          <DialogDescription>Processos vinculados a este cliente, do mais recente ao mais antigo.</DialogDescription>
+          <DialogDescription>Processos e observações migradas, do mais recente ao mais antigo.</DialogDescription>
         </DialogHeader>
         {isLoading ? (
           <p className="py-8 text-center text-sm text-muted-foreground">Carregando histórico...</p>
@@ -306,21 +306,36 @@ function ClientHistoryDialog({
           <ul className="max-h-[60vh] divide-y divide-border/40 overflow-y-auto">
             {history.map((item) => (
               <li key={item.id}>
-                <Link
-                  to="/cases/$caseId"
-                  params={{ caseId: item.id }}
-                  onClick={onClose}
-                  className="flex items-start justify-between gap-3 py-3 transition-colors hover:bg-muted/30"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{item.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.description}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date(item.created_at).toLocaleDateString('pt-BR')}
-                    </p>
+                {item.type === 'CASE' && item.case_id ? (
+                  <Link
+                    to="/cases/$caseId"
+                    params={{ caseId: item.case_id }}
+                    onClick={onClose}
+                    className="flex items-start justify-between gap-3 py-3 transition-colors hover:bg-muted/30"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{item.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    {item.status && <StatusBadge status={item.status} />}
+                  </Link>
+                ) : (
+                  <div className="flex items-start justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">{item.description}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      Observação
+                    </span>
                   </div>
-                  <StatusBadge status={item.status} />
-                </Link>
+                )}
               </li>
             ))}
           </ul>

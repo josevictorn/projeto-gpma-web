@@ -25,7 +25,7 @@ declare global {
     totalPages: number
   }
 
-  type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'LOST' | 'COMPLETED'
+  type LeadStatus = 'NEW' | 'CONTRACTED' | 'LOST' | 'CONTACTED' | 'QUALIFIED' | 'COMPLETED'
 
   interface Lead {
     id: string
@@ -93,10 +93,12 @@ declare global {
 
   // A case as returned in a client's history (issue #21). No client_id field.
   interface ClientHistoryEntry {
+    type: 'CASE' | 'LEAD_OBSERVATION'
     id: string
+    case_id: string | null
     title: string
     description: string
-    status: CaseStatus
+    status: CaseStatus | null
     created_at: string
     updated_at: string
   }

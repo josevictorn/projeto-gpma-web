@@ -157,7 +157,11 @@ function LeadDetailPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Link to="/leads" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <Link
+            to="/leads"
+            search={{ page: 1 }}
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
             <ArrowLeft className="inline-block size-4 mr-2 align-text-bottom" />
             Voltar para leads
           </Link>
@@ -180,7 +184,7 @@ function LeadDetailPage() {
         <div className="flex flex-col items-center justify-center gap-3 py-16">
           <p className="text-sm text-muted-foreground">Lead não encontrado.</p>
           <Button asChild variant="outline" size="sm">
-            <Link to="/leads">Voltar para leads</Link>
+            <Link to="/leads" search={{ page: 1 }}>Voltar para leads</Link>
           </Button>
         </div>
       ) : (

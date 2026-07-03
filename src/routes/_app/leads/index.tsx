@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
+import { convertLeadToClient } from '@/api/convert-lead-to-client'
 import { createLead } from '@/api/create-lead'
 import { deleteLead } from '@/api/delete-lead'
 import { getLeads } from '@/api/get-leads'
@@ -44,6 +45,10 @@ const statusConfig: Record<LeadStatus, { label: string; className: string }> = {
     label: 'Novo',
     className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
   },
+  CONTRACTED: {
+    label: 'Contratado',
+    className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+  },
   CONTACTED: {
     label: 'Contatado',
     className: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
@@ -62,7 +67,11 @@ const statusConfig: Record<LeadStatus, { label: string; className: string }> = {
   },
 }
 
-const statusOrder: LeadStatus[] = ['NEW', 'CONTACTED', 'QUALIFIED', 'LOST', 'COMPLETED']
+const editStatusOrder: Array<Extract<LeadStatus, 'NEW' | 'CONTRACTED' | 'LOST'>> = [
+  'NEW',
+  'CONTRACTED',
+  'LOST',
+]
 
 function StatusBadge({ status }: { status: LeadStatus }) {
   const config = statusConfig[status]
@@ -79,7 +88,49 @@ const leadSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   email: z.string().email('E-mail inválido'),
   phone: z.string().min(8, 'Telefone inválido'),
-  status: z.enum(['NEW', 'CONTACTED', 'QUALIFIED', 'LOST', 'COMPLETED']),
+  status: z.enum(['NEW', 'CONTRACTED', 'LOST']),
+  maritalStatus: z.string().optional(),
+  profession: z.string().optional(),
+  cpf: z.string().optional(),
+  rg: z.string().optional(),
+  issuingAgency: z.string().optional(),
+  street: z.string().optional(),
+  number: z.string().optional(),
+  neighborhood: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.status !== 'CONTRACTED') {
+    return
+  }
+
+  const requiredFields: Array<[keyof typeof data, string, ((value: string) => boolean)?]> = [
+    ['maritalStatus', 'Estado civil é obrigatório'],
+    ['profession', 'Profissão é obrigatória'],
+    ['cpf', 'CPF inválido', (value) => value.trim().length >= 11],
+    ['rg', 'RG é obrigatório'],
+    ['issuingAgency', 'Órgão emissor é obrigatório'],
+    ['street', 'Logradouro é obrigatório'],
+    ['number', 'Número é obrigatório'],
+    ['neighborhood', 'Bairro é obrigatório'],
+    ['city', 'Cidade é obrigatória'],
+    ['state', 'Estado é obrigatório'],
+    ['zipCode', 'CEP inválido', (value) => value.trim().length >= 8],
+  ]
+
+  for (const [field, message, validator] of requiredFields) {
+    const value = data[field]?.trim() ?? ''
+
+    if (!value) {
+      ctx.addIssue({ code: 'custom', path: [field], message })
+      continue
+    }
+
+    if (validator && !validator(value)) {
+      ctx.addIssue({ code: 'custom', path: [field], message })
+    }
+  }
 })
 
 type LeadForm = z.infer<typeof leadSchema>
@@ -92,38 +143,142 @@ interface LeadFormDialogProps {
 
 function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const isEditing = !!lead
-  const { register, handleSubmit, formState: { errors }, reset, control } = useForm<LeadForm>({
+  const { register, handleSubmit, formState: { errors }, reset, control, watch } = useForm<LeadForm>({
     resolver: zodResolver(leadSchema),
-    defaultValues: { name: '', email: '', phone: '', status: 'NEW' },
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      status: 'NEW',
+      maritalStatus: '',
+      profession: '',
+      cpf: '',
+      rg: '',
+      issuingAgency: '',
+      street: '',
+      number: '',
+      neighborhood: '',
+      city: '',
+      state: '',
+      zipCode: '',
+    },
   })
 
   useEffect(() => {
     if (open) {
       reset(
         lead
-          ? { name: lead.name, email: lead.email, phone: lead.phone, status: lead.status }
-          : { name: '', email: '', phone: '', status: 'NEW' }
+          ? {
+              name: lead.name,
+              email: lead.email,
+              phone: lead.phone,
+              status: lead.status === 'CONTACTED' || lead.status === 'QUALIFIED' || lead.status === 'COMPLETED'
+                ? 'NEW'
+                : lead.status,
+              maritalStatus: '',
+              profession: '',
+              cpf: '',
+              rg: '',
+              issuingAgency: '',
+              street: '',
+              number: '',
+              neighborhood: '',
+              city: '',
+              state: '',
+              zipCode: '',
+            }
+          : {
+              name: '',
+              email: '',
+              phone: '',
+              status: 'NEW',
+              maritalStatus: '',
+              profession: '',
+              cpf: '',
+              rg: '',
+              issuingAgency: '',
+              street: '',
+              number: '',
+              neighborhood: '',
+              city: '',
+              state: '',
+              zipCode: '',
+            }
       )
     }
   }, [open, lead, reset])
 
   const { mutate, isPending } = useMutation({
-    mutationFn: (data: LeadForm) =>
-      isEditing ? updateLead(lead.id, data) : createLead(data),
-    onSuccess: () => {
+    mutationFn: async (data: LeadForm) => {
+      if (isEditing && data.status === 'CONTRACTED') {
+        return convertLeadToClient(lead.id, {
+          maritalStatus: data.maritalStatus ?? '',
+          profession: data.profession ?? '',
+          cpf: data.cpf ?? '',
+          rg: data.rg ?? '',
+          issuingAgency: data.issuingAgency ?? '',
+          street: data.street ?? '',
+          number: data.number ?? '',
+          neighborhood: data.neighborhood ?? '',
+          city: data.city ?? '',
+          state: data.state ?? '',
+          zipCode: data.zipCode ?? '',
+        })
+      }
+
+      if (isEditing) {
+        return updateLead(lead.id, {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          status: data.status,
+        })
+      }
+
+      return createLead({
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+      })
+    },
+    onSuccess: (_result, data) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] })
-      toast.success(isEditing ? 'Lead atualizado com sucesso.' : 'Lead criado com sucesso.')
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      toast.success(
+        isEditing && data.status === 'CONTRACTED'
+          ? 'Lead convertido em cliente com sucesso.'
+          : isEditing
+            ? 'Lead atualizado com sucesso.'
+            : 'Lead criado com sucesso.'
+      )
       reset()
       onClose()
+
+      if (isEditing && data.status === 'CONTRACTED') {
+        navigate({ to: '/clients', search: { page: 1 } })
+      }
     },
     onError: (error) =>
-      toast.error(getErrorMessage(error, isEditing ? 'Erro ao atualizar lead.' : 'Erro ao criar lead.')),
+      toast.error(
+        getErrorMessage(
+          error,
+          isEditing && selectedStatus === 'CONTRACTED'
+            ? 'Erro ao converter lead em cliente.'
+            : isEditing
+              ? 'Erro ao atualizar lead.'
+              : 'Erro ao criar lead.'
+        )
+      ),
   })
 
   function handleOpenChange(isOpen: boolean) {
     if (!isOpen) { reset(); onClose() }
   }
+
+  const selectedStatus = watch('status')
+  const statusOptions = editStatusOrder
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -152,31 +307,113 @@ function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
             <Input {...register('phone')} placeholder="(84) 99999-9999" />
             {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
           </div>
-          <div className="space-y-1.5">
-            <p className="text-sm font-medium">Status</p>
-            <Controller
-              name="status"
-              control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOrder.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {statusConfig[status].label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
+          {isEditing ? (
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Status</p>
+              <Controller
+                name="status"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {statusConfig[status].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Status inicial</p>
+              <Input value="Novo" disabled />
+            </div>
+          )}
+          {isEditing && selectedStatus === 'CONTRACTED' && (
+            <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+              <div>
+                <p className="text-sm font-medium">Dados para conversão em cliente</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ao clicar em converter, o lead será removido da lista de leads e criado em clientes.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Estado civil</p>
+                  <Input {...register('maritalStatus')} placeholder="Ex: Solteiro(a)" />
+                  {errors.maritalStatus && <p className="text-xs text-destructive">{errors.maritalStatus.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Profissão</p>
+                  <Input {...register('profession')} placeholder="Ex: Engenheiro" />
+                  {errors.profession && <p className="text-xs text-destructive">{errors.profession.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">CPF</p>
+                  <Input {...register('cpf')} placeholder="000.000.000-00" />
+                  {errors.cpf && <p className="text-xs text-destructive">{errors.cpf.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">RG</p>
+                  <Input {...register('rg')} placeholder="0000000" />
+                  {errors.rg && <p className="text-xs text-destructive">{errors.rg.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Órgão emissor</p>
+                  <Input {...register('issuingAgency')} placeholder="Ex: SSP/RN" />
+                  {errors.issuingAgency && <p className="text-xs text-destructive">{errors.issuingAgency.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">CEP</p>
+                  <Input {...register('zipCode')} placeholder="00000-000" />
+                  {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode.message}</p>}
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <p className="text-sm font-medium">Logradouro</p>
+                  <Input {...register('street')} placeholder="Rua / Avenida" />
+                  {errors.street && <p className="text-xs text-destructive">{errors.street.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Número</p>
+                  <Input {...register('number')} placeholder="123" />
+                  {errors.number && <p className="text-xs text-destructive">{errors.number.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Bairro</p>
+                  <Input {...register('neighborhood')} placeholder="Bairro" />
+                  {errors.neighborhood && <p className="text-xs text-destructive">{errors.neighborhood.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Cidade</p>
+                  <Input {...register('city')} placeholder="Cidade" />
+                  {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">Estado</p>
+                  <Input {...register('state')} placeholder="UF" />
+                  {errors.state && <p className="text-xs text-destructive">{errors.state.message}</p>}
+                </div>
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>Cancelar</Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar lead'}
+              {isPending
+                ? isEditing && selectedStatus === 'CONTRACTED'
+                  ? 'Convertendo...'
+                  : 'Salvando...'
+                : isEditing && selectedStatus === 'CONTRACTED'
+                  ? 'Converter em cliente'
+                  : isEditing
+                    ? 'Salvar'
+                    : 'Criar lead'}
             </Button>
           </DialogFooter>
         </form>
