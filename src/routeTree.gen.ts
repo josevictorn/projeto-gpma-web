@@ -18,6 +18,7 @@ import { Route as AuthChangePasswordIndexRouteImport } from './routes/_auth/chan
 import { Route as AppUsersIndexRouteImport } from './routes/_app/users/index'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppReportsIndexRouteImport } from './routes/_app/reports/index'
+import { Route as AppPaymentMethodsIndexRouteImport } from './routes/_app/payment-methods/index'
 import { Route as AppLeadsIndexRouteImport } from './routes/_app/leads/index'
 import { Route as AppFinancialIndexRouteImport } from './routes/_app/financial/index'
 import { Route as AppDocumentsIndexRouteImport } from './routes/_app/documents/index'
@@ -72,6 +73,11 @@ const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
 const AppReportsIndexRoute = AppReportsIndexRouteImport.update({
   id: '/reports/',
   path: '/reports/',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
+const AppPaymentMethodsIndexRoute = AppPaymentMethodsIndexRouteImport.update({
+  id: '/payment-methods/',
+  path: '/payment-methods/',
   getParentRoute: () => AppLayoutRoute,
 } as any)
 const AppLeadsIndexRoute = AppLeadsIndexRouteImport.update({
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/documents/': typeof AppDocumentsIndexRoute
   '/financial/': typeof AppFinancialIndexRoute
   '/leads/': typeof AppLeadsIndexRoute
+  '/payment-methods/': typeof AppPaymentMethodsIndexRoute
   '/reports/': typeof AppReportsIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/users/': typeof AppUsersIndexRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/documents': typeof AppDocumentsIndexRoute
   '/financial': typeof AppFinancialIndexRoute
   '/leads': typeof AppLeadsIndexRoute
+  '/payment-methods': typeof AppPaymentMethodsIndexRoute
   '/reports': typeof AppReportsIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/users': typeof AppUsersIndexRoute
@@ -194,6 +202,7 @@ export interface FileRoutesById {
   '/_app/documents/': typeof AppDocumentsIndexRoute
   '/_app/financial/': typeof AppFinancialIndexRoute
   '/_app/leads/': typeof AppLeadsIndexRoute
+  '/_app/payment-methods/': typeof AppPaymentMethodsIndexRoute
   '/_app/reports/': typeof AppReportsIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/users/': typeof AppUsersIndexRoute
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/financial/'
     | '/leads/'
+    | '/payment-methods/'
     | '/reports/'
     | '/settings/'
     | '/users/'
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/financial'
     | '/leads'
+    | '/payment-methods'
     | '/reports'
     | '/settings'
     | '/users'
@@ -261,6 +272,7 @@ export interface FileRouteTypes {
     | '/_app/documents/'
     | '/_app/financial/'
     | '/_app/leads/'
+    | '/_app/payment-methods/'
     | '/_app/reports/'
     | '/_app/settings/'
     | '/_app/users/'
@@ -338,6 +350,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports/'
       preLoaderRoute: typeof AppReportsIndexRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
+    '/_app/payment-methods/': {
+      id: '/_app/payment-methods/'
+      path: '/payment-methods'
+      fullPath: '/payment-methods/'
+      preLoaderRoute: typeof AppPaymentMethodsIndexRouteImport
       parentRoute: typeof AppLayoutRoute
     }
     '/_app/leads/': {
@@ -440,6 +459,7 @@ interface AppLayoutRouteChildren {
   AppDocumentsIndexRoute: typeof AppDocumentsIndexRoute
   AppFinancialIndexRoute: typeof AppFinancialIndexRoute
   AppLeadsIndexRoute: typeof AppLeadsIndexRoute
+  AppPaymentMethodsIndexRoute: typeof AppPaymentMethodsIndexRoute
   AppReportsIndexRoute: typeof AppReportsIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppUsersIndexRoute: typeof AppUsersIndexRoute
@@ -458,6 +478,7 @@ const AppLayoutRouteChildren: AppLayoutRouteChildren = {
   AppDocumentsIndexRoute: AppDocumentsIndexRoute,
   AppFinancialIndexRoute: AppFinancialIndexRoute,
   AppLeadsIndexRoute: AppLeadsIndexRoute,
+  AppPaymentMethodsIndexRoute: AppPaymentMethodsIndexRoute,
   AppReportsIndexRoute: AppReportsIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppUsersIndexRoute: AppUsersIndexRoute,
