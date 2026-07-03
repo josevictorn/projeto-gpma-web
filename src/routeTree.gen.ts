@@ -16,10 +16,19 @@ import { Route as AuthSignInIndexRouteImport } from './routes/_auth/sign-in/inde
 import { Route as AuthResetPasswordIndexRouteImport } from './routes/_auth/reset-password/index'
 import { Route as AuthChangePasswordIndexRouteImport } from './routes/_auth/change-password/index'
 import { Route as AppUsersIndexRouteImport } from './routes/_app/users/index'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppReportsIndexRouteImport } from './routes/_app/reports/index'
 import { Route as AppLeadsIndexRouteImport } from './routes/_app/leads/index'
+import { Route as AppFinancialIndexRouteImport } from './routes/_app/financial/index'
+import { Route as AppDocumentsIndexRouteImport } from './routes/_app/documents/index'
 import { Route as AppDashboardIndexRouteImport } from './routes/_app/dashboard/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppCasesIndexRouteImport } from './routes/_app/cases/index'
+import { Route as AppAgendaIndexRouteImport } from './routes/_app/agenda/index'
+import { Route as AppLeadsLeadIdRouteImport } from './routes/_app/leads/$leadId'
+import { Route as AppFinancialPaymentsRouteImport } from './routes/_app/financial/payments'
+import { Route as AppFinancialFeesRouteImport } from './routes/_app/financial/fees'
+import { Route as AppFinancialContractsRouteImport } from './routes/_app/financial/contracts'
 import { Route as AppCasesCaseIdRouteImport } from './routes/_app/cases/$caseId'
 
 const AuthLayoutRoute = AuthLayoutRouteImport.update({
@@ -55,9 +64,29 @@ const AppUsersIndexRoute = AppUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => AppLayoutRoute,
 } as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
+const AppReportsIndexRoute = AppReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
 const AppLeadsIndexRoute = AppLeadsIndexRouteImport.update({
   id: '/leads/',
   path: '/leads/',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
+const AppFinancialIndexRoute = AppFinancialIndexRouteImport.update({
+  id: '/financial/',
+  path: '/financial/',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
+const AppDocumentsIndexRoute = AppDocumentsIndexRouteImport.update({
+  id: '/documents/',
+  path: '/documents/',
   getParentRoute: () => AppLayoutRoute,
 } as any)
 const AppDashboardIndexRoute = AppDashboardIndexRouteImport.update({
@@ -75,6 +104,31 @@ const AppCasesIndexRoute = AppCasesIndexRouteImport.update({
   path: '/cases/',
   getParentRoute: () => AppLayoutRoute,
 } as any)
+const AppAgendaIndexRoute = AppAgendaIndexRouteImport.update({
+  id: '/agenda/',
+  path: '/agenda/',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
+const AppLeadsLeadIdRoute = AppLeadsLeadIdRouteImport.update({
+  id: '/leads/$leadId',
+  path: '/leads/$leadId',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
+const AppFinancialPaymentsRoute = AppFinancialPaymentsRouteImport.update({
+  id: '/financial/payments',
+  path: '/financial/payments',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
+const AppFinancialFeesRoute = AppFinancialFeesRouteImport.update({
+  id: '/financial/fees',
+  path: '/financial/fees',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
+const AppFinancialContractsRoute = AppFinancialContractsRouteImport.update({
+  id: '/financial/contracts',
+  path: '/financial/contracts',
+  getParentRoute: () => AppLayoutRoute,
+} as any)
 const AppCasesCaseIdRoute = AppCasesCaseIdRouteImport.update({
   id: '/cases/$caseId',
   path: '/cases/$caseId',
@@ -84,10 +138,19 @@ const AppCasesCaseIdRoute = AppCasesCaseIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cases/$caseId': typeof AppCasesCaseIdRoute
+  '/financial/contracts': typeof AppFinancialContractsRoute
+  '/financial/fees': typeof AppFinancialFeesRoute
+  '/financial/payments': typeof AppFinancialPaymentsRoute
+  '/leads/$leadId': typeof AppLeadsLeadIdRoute
+  '/agenda/': typeof AppAgendaIndexRoute
   '/cases/': typeof AppCasesIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/dashboard/': typeof AppDashboardIndexRoute
+  '/documents/': typeof AppDocumentsIndexRoute
+  '/financial/': typeof AppFinancialIndexRoute
   '/leads/': typeof AppLeadsIndexRoute
+  '/reports/': typeof AppReportsIndexRoute
+  '/settings/': typeof AppSettingsIndexRoute
   '/users/': typeof AppUsersIndexRoute
   '/change-password/': typeof AuthChangePasswordIndexRoute
   '/reset-password/': typeof AuthResetPasswordIndexRoute
@@ -96,10 +159,19 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cases/$caseId': typeof AppCasesCaseIdRoute
+  '/financial/contracts': typeof AppFinancialContractsRoute
+  '/financial/fees': typeof AppFinancialFeesRoute
+  '/financial/payments': typeof AppFinancialPaymentsRoute
+  '/leads/$leadId': typeof AppLeadsLeadIdRoute
+  '/agenda': typeof AppAgendaIndexRoute
   '/cases': typeof AppCasesIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/dashboard': typeof AppDashboardIndexRoute
+  '/documents': typeof AppDocumentsIndexRoute
+  '/financial': typeof AppFinancialIndexRoute
   '/leads': typeof AppLeadsIndexRoute
+  '/reports': typeof AppReportsIndexRoute
+  '/settings': typeof AppSettingsIndexRoute
   '/users': typeof AppUsersIndexRoute
   '/change-password': typeof AuthChangePasswordIndexRoute
   '/reset-password': typeof AuthResetPasswordIndexRoute
@@ -111,10 +183,19 @@ export interface FileRoutesById {
   '/_app': typeof AppLayoutRouteWithChildren
   '/_auth': typeof AuthLayoutRouteWithChildren
   '/_app/cases/$caseId': typeof AppCasesCaseIdRoute
+  '/_app/financial/contracts': typeof AppFinancialContractsRoute
+  '/_app/financial/fees': typeof AppFinancialFeesRoute
+  '/_app/financial/payments': typeof AppFinancialPaymentsRoute
+  '/_app/leads/$leadId': typeof AppLeadsLeadIdRoute
+  '/_app/agenda/': typeof AppAgendaIndexRoute
   '/_app/cases/': typeof AppCasesIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/dashboard/': typeof AppDashboardIndexRoute
+  '/_app/documents/': typeof AppDocumentsIndexRoute
+  '/_app/financial/': typeof AppFinancialIndexRoute
   '/_app/leads/': typeof AppLeadsIndexRoute
+  '/_app/reports/': typeof AppReportsIndexRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/users/': typeof AppUsersIndexRoute
   '/_auth/change-password/': typeof AuthChangePasswordIndexRoute
   '/_auth/reset-password/': typeof AuthResetPasswordIndexRoute
@@ -125,10 +206,19 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/cases/$caseId'
+    | '/financial/contracts'
+    | '/financial/fees'
+    | '/financial/payments'
+    | '/leads/$leadId'
+    | '/agenda/'
     | '/cases/'
     | '/clients/'
     | '/dashboard/'
+    | '/documents/'
+    | '/financial/'
     | '/leads/'
+    | '/reports/'
+    | '/settings/'
     | '/users/'
     | '/change-password/'
     | '/reset-password/'
@@ -137,10 +227,19 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/cases/$caseId'
+    | '/financial/contracts'
+    | '/financial/fees'
+    | '/financial/payments'
+    | '/leads/$leadId'
+    | '/agenda'
     | '/cases'
     | '/clients'
     | '/dashboard'
+    | '/documents'
+    | '/financial'
     | '/leads'
+    | '/reports'
+    | '/settings'
     | '/users'
     | '/change-password'
     | '/reset-password'
@@ -151,10 +250,19 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_auth'
     | '/_app/cases/$caseId'
+    | '/_app/financial/contracts'
+    | '/_app/financial/fees'
+    | '/_app/financial/payments'
+    | '/_app/leads/$leadId'
+    | '/_app/agenda/'
     | '/_app/cases/'
     | '/_app/clients/'
     | '/_app/dashboard/'
+    | '/_app/documents/'
+    | '/_app/financial/'
     | '/_app/leads/'
+    | '/_app/reports/'
+    | '/_app/settings/'
     | '/_app/users/'
     | '/_auth/change-password/'
     | '/_auth/reset-password/'
@@ -218,11 +326,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUsersIndexRouteImport
       parentRoute: typeof AppLayoutRoute
     }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
+    '/_app/reports/': {
+      id: '/_app/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof AppReportsIndexRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
     '/_app/leads/': {
       id: '/_app/leads/'
       path: '/leads'
       fullPath: '/leads/'
       preLoaderRoute: typeof AppLeadsIndexRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
+    '/_app/financial/': {
+      id: '/_app/financial/'
+      path: '/financial'
+      fullPath: '/financial/'
+      preLoaderRoute: typeof AppFinancialIndexRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
+    '/_app/documents/': {
+      id: '/_app/documents/'
+      path: '/documents'
+      fullPath: '/documents/'
+      preLoaderRoute: typeof AppDocumentsIndexRouteImport
       parentRoute: typeof AppLayoutRoute
     }
     '/_app/dashboard/': {
@@ -246,6 +382,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCasesIndexRouteImport
       parentRoute: typeof AppLayoutRoute
     }
+    '/_app/agenda/': {
+      id: '/_app/agenda/'
+      path: '/agenda'
+      fullPath: '/agenda/'
+      preLoaderRoute: typeof AppAgendaIndexRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
+    '/_app/leads/$leadId': {
+      id: '/_app/leads/$leadId'
+      path: '/leads/$leadId'
+      fullPath: '/leads/$leadId'
+      preLoaderRoute: typeof AppLeadsLeadIdRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
+    '/_app/financial/payments': {
+      id: '/_app/financial/payments'
+      path: '/financial/payments'
+      fullPath: '/financial/payments'
+      preLoaderRoute: typeof AppFinancialPaymentsRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
+    '/_app/financial/fees': {
+      id: '/_app/financial/fees'
+      path: '/financial/fees'
+      fullPath: '/financial/fees'
+      preLoaderRoute: typeof AppFinancialFeesRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
+    '/_app/financial/contracts': {
+      id: '/_app/financial/contracts'
+      path: '/financial/contracts'
+      fullPath: '/financial/contracts'
+      preLoaderRoute: typeof AppFinancialContractsRouteImport
+      parentRoute: typeof AppLayoutRoute
+    }
     '/_app/cases/$caseId': {
       id: '/_app/cases/$caseId'
       path: '/cases/$caseId'
@@ -258,19 +429,37 @@ declare module '@tanstack/react-router' {
 
 interface AppLayoutRouteChildren {
   AppCasesCaseIdRoute: typeof AppCasesCaseIdRoute
+  AppFinancialContractsRoute: typeof AppFinancialContractsRoute
+  AppFinancialFeesRoute: typeof AppFinancialFeesRoute
+  AppFinancialPaymentsRoute: typeof AppFinancialPaymentsRoute
+  AppLeadsLeadIdRoute: typeof AppLeadsLeadIdRoute
+  AppAgendaIndexRoute: typeof AppAgendaIndexRoute
   AppCasesIndexRoute: typeof AppCasesIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppDashboardIndexRoute: typeof AppDashboardIndexRoute
+  AppDocumentsIndexRoute: typeof AppDocumentsIndexRoute
+  AppFinancialIndexRoute: typeof AppFinancialIndexRoute
   AppLeadsIndexRoute: typeof AppLeadsIndexRoute
+  AppReportsIndexRoute: typeof AppReportsIndexRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppUsersIndexRoute: typeof AppUsersIndexRoute
 }
 
 const AppLayoutRouteChildren: AppLayoutRouteChildren = {
   AppCasesCaseIdRoute: AppCasesCaseIdRoute,
+  AppFinancialContractsRoute: AppFinancialContractsRoute,
+  AppFinancialFeesRoute: AppFinancialFeesRoute,
+  AppFinancialPaymentsRoute: AppFinancialPaymentsRoute,
+  AppLeadsLeadIdRoute: AppLeadsLeadIdRoute,
+  AppAgendaIndexRoute: AppAgendaIndexRoute,
   AppCasesIndexRoute: AppCasesIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppDashboardIndexRoute: AppDashboardIndexRoute,
+  AppDocumentsIndexRoute: AppDocumentsIndexRoute,
+  AppFinancialIndexRoute: AppFinancialIndexRoute,
   AppLeadsIndexRoute: AppLeadsIndexRoute,
+  AppReportsIndexRoute: AppReportsIndexRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppUsersIndexRoute: AppUsersIndexRoute,
 }
 

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUser } from '@/contexts/user'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
@@ -389,6 +389,12 @@ function LeadsPage() {
                     <td className="px-5 py-3.5"><StatusBadge status={lead.status} /></td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon-sm" asChild>
+                          <Link to="/leads/$leadId" params={{ leadId: lead.id }} title="Ver lead">
+                            <span className="sr-only">Ver lead</span>
+                            <Users className="size-3.5" />
+                          </Link>
+                        </Button>
                         <Button variant="ghost" size="icon-sm" onClick={() => openEdit(lead)} title="Editar lead">
                           <Pencil className="size-3.5" />
                         </Button>
