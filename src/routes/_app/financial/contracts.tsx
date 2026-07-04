@@ -90,7 +90,10 @@ const contractSchema = z.object({
   signedAt: z.string().min(1, 'Data de assinatura é obrigatória'),
   serviceDescription: z.string().min(1, 'Objeto do contrato é obrigatório'),
   feeType: z.enum(['FIXED', 'HOURLY', 'SUCCESS', 'MIXED']),
-  feeValue: z.number().positive('Valor de honorários deve ser maior que zero'),
+  feeValue: z
+    .number({ error: 'Informe um valor válido de honorários.' })
+    .finite('Informe um valor válido de honorários.')
+    .positive('Informe valor maior que zero.'),
   paymentTerms: z.string().min(1, 'Condição de pagamento é obrigatória'),
   status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']),
 })
@@ -258,6 +261,14 @@ function ContractFormDialog({
               : 'Preencha os dados obrigatórios para formalizar o contrato com o cliente.'}
           </DialogDescription>
         </DialogHeader>
+        {isEditing && contract && (
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Honorário atual</p>
+            <p className="text-sm font-semibold text-foreground">
+              {formatCurrencyBRL(contract.fee_value)} · {feeTypeLabel[contract.fee_type]}
+            </p>
+          </div>
+        )}
         <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Número do contrato" error={errors.contractNumber?.message}>
@@ -348,11 +359,27 @@ function ContractFormDialog({
             </Field>
             <Field label="Valor de honorários (R$)" error={errors.feeValue?.message}>
               <Input
-                {...register('feeValue', { valueAsNumber: true })}
+                {...register('feeValue', {
+                  setValueAs: (value) => {
+                    if (value === '' || value === null || value === undefined) {
+                      return Number.NaN
+                    }
+
+                    const normalized = String(value).replace(',', '.')
+                    const parsed = Number(normalized)
+
+                    return Number.isFinite(parsed) ? parsed : Number.NaN
+                  },
+                })}
                 type="number"
                 step="0.01"
                 min="0"
+                placeholder="0,00"
+                inputMode="decimal"
               />
+              <p className="text-xs text-muted-foreground">
+                Valor informado: {formatCurrencyBRL(watch('feeValue') || 0)}
+              </p>
             </Field>
             <Field label="Status" error={errors.status?.message}>
               <Controller
@@ -785,4 +812,11 @@ function ContractsPage() {
       />
     </div>
   )
+}
+
+function formatCurrencyBRL(value: number) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value)
 }

@@ -35,7 +35,6 @@ const mainNavItems: NavItem[] = [
     to: '/financial',
     children: [
       { label: 'Formas de Pagamento', to: '/payment-methods' },
-      { label: 'Honorários', to: '/financial/fees' },
       { label: 'Contratos', to: '/financial/contracts' },
       { label: 'Pagamentos', to: '/financial/payments' },
     ],
