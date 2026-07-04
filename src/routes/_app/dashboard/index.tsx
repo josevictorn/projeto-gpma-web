@@ -5,7 +5,6 @@ import {
   Briefcase,
   Calendar,
   Clock,
-  MapPin,
   UserCheck,
   Users,
 } from 'lucide-react'
@@ -15,6 +14,7 @@ import { z } from 'zod'
 import { getCases } from '@/api/get-cases'
 import { getClients } from '@/api/get-clients'
 import { getLeads } from '@/api/get-leads'
+import { getAppointments } from '@/api/get-appointments'
 import { useUser } from '@/contexts/user'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -41,37 +41,6 @@ const caseStatusConfig: Record<CaseStatus, { label: string; className: string }>
   },
 }
 
-// Agenda/audiências ainda não têm módulo no backend — dados ilustrativos.
-const upcomingHearings = [
-  {
-    id: 1,
-    process: 'Processo nº 0001234-12.2026',
-    client: 'Carlos Mendonça',
-    time: '09:00',
-    date: 'Hoje',
-    location: 'Vara do Trabalho — Natal',
-    urgent: true,
-  },
-  {
-    id: 2,
-    process: 'Processo nº 0005678-45.2026',
-    client: 'Roberto Alves',
-    time: '14:30',
-    date: 'Hoje',
-    location: '2ª Vara Criminal — Natal',
-    urgent: true,
-  },
-  {
-    id: 3,
-    process: 'Processo nº 0009012-78.2026',
-    client: 'Ana Paula Ferreira',
-    time: '10:00',
-    date: 'Amanhã',
-    location: '3ª Vara Cível — Natal',
-    urgent: false,
-  },
-]
-
 function DashboardPage() {
   const { unauthorized } = Route.useSearch()
 
@@ -82,6 +51,10 @@ function DashboardPage() {
   }, [unauthorized])
 
   const { userInfo } = useUser()
+  const canSeeAgenda = userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER'
+  const now = new Date()
+  const month = now.getMonth() + 1
+  const year = now.getFullYear()
 
   const { data: leadsData } = useQuery({
     queryKey: ['leads', 1, 'NEW'],
@@ -93,9 +66,43 @@ function DashboardPage() {
     queryKey: ['cases', 1],
     queryFn: () => getCases(1),
   })
+  const { data: appointments = [], isLoading: loadingAppointments } = useQuery({
+    queryKey: ['appointments', year, month],
+    queryFn: () => getAppointments(month, year),
+    enabled: canSeeAgenda,
+  })
 
   const clientNameById = new Map((clientsData?.results ?? []).map((c) => [c.id, c.name]))
   const recentCases = (casesData?.results ?? []).slice(0, 5)
+  const appointmentsToday = appointments.filter((appointment) =>
+    sameDay(new Date(appointment.starts_at), now)
+  ).length
+
+  const displayedHearings = canSeeAgenda
+    ? appointments
+        .map((appointment) => ({
+          id: appointment.id,
+          title: appointment.title,
+          description: appointment.description,
+          startsAt: new Date(appointment.starts_at),
+        }))
+        .filter((appointment) => appointment.startsAt.getTime() >= now.getTime())
+        .sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime())
+        .slice(0, 5)
+        .map((appointment) => ({
+          id: appointment.id,
+          title: appointment.title,
+          description: appointment.description,
+          time: appointment.startsAt.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          date: sameDay(appointment.startsAt, now)
+            ? 'Hoje'
+            : appointment.startsAt.toLocaleDateString('pt-BR'),
+          urgent: sameDay(appointment.startsAt, now),
+        }))
+    : []
 
   const fmt = (n?: number) => (n === undefined ? '—' : String(n))
 
@@ -133,8 +140,8 @@ function DashboardPage() {
     },
     {
       label: 'Audiências Hoje',
-      value: '—',
-      hint: 'Agenda não integrada',
+      value: canSeeAgenda ? String(appointmentsToday) : '—',
+      hint: canSeeAgenda ? 'Compromissos na agenda' : 'Indisponível para o perfil',
       icon: Calendar,
       color: 'text-violet-500',
       bg: 'bg-violet-500/10',
@@ -151,33 +158,6 @@ function DashboardPage() {
     month: 'long',
     year: 'numeric',
   })
-  // If logged user is a CLIENT, show upcoming hearings only for their cases
-  // If logged user is a LAWYER, show upcoming hearings only for cases assigned to them
-  const displayedHearings = userInfo?.role === 'CLIENT'
-    ? (casesData?.results ?? []).slice(0, 5).map((c) => ({
-        id: c.id,
-        process: `Caso: ${c.title}`,
-        client: userInfo.name,
-        time: new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        date: new Date(c.created_at).toLocaleDateString('pt-BR'),
-        location: 'Tribunal (não integrado)',
-        urgent: false,
-      }))
-    : userInfo?.role === 'LAWYER'
-    ? (casesData?.results ?? [])
-        .filter((c) => c.assigned_lawyer_id === userInfo.id)
-        .slice(0, 5)
-        .map((c) => ({
-          id: c.id,
-          process: `Caso: ${c.title}`,
-          client: clientNameById.get(c.client_id) ?? '—',
-          time: new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          date: new Date(c.created_at).toLocaleDateString('pt-BR'),
-          location: 'Tribunal (não integrado)',
-          urgent: false,
-        }))
-    : upcomingHearings
-
   return (
     <div className="p-6 space-y-6">
       {/* Page header */}
@@ -291,19 +271,18 @@ function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Upcoming hearings — agenda ainda não integrada ao backend */}
+        {/* Upcoming hearings */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-sm font-semibold">Próximas Audiências</CardTitle>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                Em breve
-              </span>
-            </div>
+            <CardTitle className="text-sm font-semibold">Próximas Audiências</CardTitle>
           </CardHeader>
           <Separator />
           <CardContent className="p-4 space-y-3">
-            {displayedHearings.length === 0 ? (
+            {loadingAppointments && canSeeAgenda ? (
+              <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                Carregando agenda...
+              </div>
+            ) : displayedHearings.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
                 Sem audiências marcadas.
               </div>
@@ -315,7 +294,7 @@ function DashboardPage() {
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <p className="text-xs font-medium leading-tight line-clamp-1">
-                      {hearing.client}
+                      {hearing.title}
                     </p>
                     {hearing.urgent ? (
                       <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
@@ -327,17 +306,15 @@ function DashboardPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] font-mono text-muted-foreground mb-2 line-clamp-1">
-                    {hearing.process}
-                  </p>
+                  {hearing.description && (
+                    <p className="text-[11px] text-muted-foreground mb-2 line-clamp-2">
+                      {hearing.description}
+                    </p>
+                  )}
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="size-3" />
                       {hearing.time}
-                    </span>
-                    <span className="flex items-center gap-1 line-clamp-1">
-                      <MapPin className="size-3 shrink-0" />
-                      <span className="truncate">{hearing.location}</span>
                     </span>
                   </div>
                 </div>
@@ -347,5 +324,13 @@ function DashboardPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+function sameDay(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
   )
 }
