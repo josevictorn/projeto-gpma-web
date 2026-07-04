@@ -5,6 +5,7 @@ export interface UpdateCaseBody {
   description?: string
   status?: CaseStatus
   clientId?: string
+  assignedLawyerId?: string
 }
 
 export async function updateCase(id: string, body: UpdateCaseBody) {

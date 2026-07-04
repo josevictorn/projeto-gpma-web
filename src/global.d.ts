@@ -65,8 +65,6 @@ declare global {
     description: string
     status: CaseStatus
     client_id: string
-    // Not yet returned by the documented backend; optional so the dashboard's
-    // "cases assigned to lawyer" filter compiles and works once it's exposed.
     assigned_lawyer_id?: string | null
     created_at: string
     updated_at: string

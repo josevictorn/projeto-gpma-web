@@ -5,6 +5,7 @@ export interface CreateCaseBody {
   title: string
   description: string
   clientId: string
+  assignedLawyerId: string
 }
 
 // This endpoint wraps the created resource in a `case` key.

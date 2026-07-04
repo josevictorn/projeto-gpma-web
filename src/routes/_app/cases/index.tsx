@@ -12,6 +12,7 @@ import { createCase } from '@/api/create-case'
 import { deleteCase } from '@/api/delete-case'
 import { getAllClients } from '@/api/get-all-clients'
 import { getCases } from '@/api/get-cases'
+import { getUsers } from '@/api/get-users'
 import { updateCase } from '@/api/update-case'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
@@ -48,6 +49,7 @@ const caseSchema = z.object({
   title: z.string().min(3, 'Título deve ter pelo menos 3 caracteres'),
   description: z.string().min(1, 'Campo obrigatório'),
   clientId: z.string().uuid('Selecione um cliente'),
+  assignedLawyerId: z.string().uuid('Selecione um advogado'),
   status: z.enum(['OPEN', 'PENDING', 'CLOSED']),
 })
 
@@ -56,16 +58,17 @@ type CaseForm = z.infer<typeof caseSchema>
 interface CaseFormDialogProps {
   caseItem: Case | null
   clients: Client[]
+  lawyers: User[]
   open: boolean
   onClose: () => void
 }
 
-function CaseFormDialog({ caseItem, clients, open, onClose }: CaseFormDialogProps) {
+function CaseFormDialog({ caseItem, clients, lawyers, open, onClose }: CaseFormDialogProps) {
   const queryClient = useQueryClient()
   const isEditing = !!caseItem
   const { register, handleSubmit, formState: { errors }, reset, control } = useForm<CaseForm>({
     resolver: zodResolver(caseSchema),
-    defaultValues: { title: '', description: '', clientId: '', status: 'OPEN' },
+    defaultValues: { title: '', description: '', clientId: '', assignedLawyerId: '', status: 'OPEN' },
   })
 
   useEffect(() => {
@@ -76,9 +79,10 @@ function CaseFormDialog({ caseItem, clients, open, onClose }: CaseFormDialogProp
               title: caseItem.title,
               description: caseItem.description,
               clientId: caseItem.client_id,
+              assignedLawyerId: caseItem.assigned_lawyer_id ?? '',
               status: caseItem.status,
             }
-          : { title: '', description: '', clientId: '', status: 'OPEN' }
+          : { title: '', description: '', clientId: '', assignedLawyerId: '', status: 'OPEN' }
       )
     }
   }, [open, caseItem, reset])
@@ -87,7 +91,12 @@ function CaseFormDialog({ caseItem, clients, open, onClose }: CaseFormDialogProp
     mutationFn: (data: CaseForm) =>
       isEditing
         ? updateCase(caseItem.id, data)
-        : createCase({ title: data.title, description: data.description, clientId: data.clientId }),
+        : createCase({
+            title: data.title,
+            description: data.description,
+            clientId: data.clientId,
+            assignedLawyerId: data.assignedLawyerId,
+          }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cases'] })
       toast.success(isEditing ? 'Caso atualizado com sucesso.' : 'Caso criado com sucesso.')
@@ -158,6 +167,30 @@ function CaseFormDialog({ caseItem, clients, open, onClose }: CaseFormDialogProp
               </p>
             )}
           </div>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Advogado responsável</p>
+            <Controller
+              name="assignedLawyerId"
+              control={control}
+              render={({ field }) => (
+                <Combobox
+                  options={lawyers.map((lawyer) => ({ value: lawyer.id, label: lawyer.name }))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={lawyers.length === 0}
+                  placeholder="Selecione um advogado"
+                  searchPlaceholder="Buscar advogado..."
+                  emptyText="Nenhum advogado encontrado."
+                />
+              )}
+            />
+            {errors.assignedLawyerId && <p className="text-xs text-destructive">{errors.assignedLawyerId.message}</p>}
+            {lawyers.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Cadastre um usuário com perfil advogado antes de abrir um caso.
+              </p>
+            )}
+          </div>
           {isEditing && (
             <div className="space-y-1.5">
               <p className="text-sm font-medium">Status</p>
@@ -183,7 +216,7 @@ function CaseFormDialog({ caseItem, clients, open, onClose }: CaseFormDialogProp
           )}
           <DialogFooter>
             <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>Cancelar</Button>
-            <Button type="submit" disabled={isPending || (!isEditing && clients.length === 0)}>
+            <Button type="submit" disabled={isPending || (!isEditing && (clients.length === 0 || lawyers.length === 0))}>
               {isPending ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar caso'}
             </Button>
           </DialogFooter>
@@ -261,9 +294,16 @@ function CasesPage() {
     enabled: userInfo?.role === 'ADMIN',
   })
 
+  const { data: usersData } = useQuery({
+    queryKey: ['users', 1],
+    queryFn: () => getUsers(1),
+    enabled: userInfo?.role === 'ADMIN',
+  })
+
   const cases = data?.results ?? []
   const meta = data?.meta
   const clients = userInfo?.role === 'CLIENT' ? [] : clientsData ?? []
+  const lawyers = (usersData?.results ?? []).filter((user) => user.role === 'LAWYER')
   const clientNameById = new Map(clients.map((client) => [client.id, client.name]))
   const canManage = userInfo?.role === 'ADMIN'
 
@@ -394,7 +434,7 @@ function CasesPage() {
                     </div>
                   </div>
                     <div className="flex shrink-0 gap-1">
-                      {userInfo?.role !== 'CLIENT' && (
+                      {canManage && (
                         <>
                           <Button variant="ghost" size="icon-sm" onClick={() => openEdit(caseItem)} title="Editar caso">
                             <Pencil className="size-3.5" />
@@ -444,7 +484,7 @@ function CasesPage() {
         )}
       </div>
 
-      <CaseFormDialog caseItem={editingCase} clients={clients} open={formOpen} onClose={() => setFormOpen(false)} />
+      <CaseFormDialog caseItem={editingCase} clients={clients} lawyers={lawyers} open={formOpen} onClose={() => setFormOpen(false)} />
       <DeleteCaseDialog caseItem={deletingCase} open={!!deletingCase} onClose={() => setDeletingCase(null)} />
     </div>
   )
