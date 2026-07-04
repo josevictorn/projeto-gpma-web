@@ -100,6 +100,15 @@ declare global {
     updated_at: string
   }
 
+  interface Appointment {
+    id: string
+    title: string
+    description: string | null
+    starts_at: string
+    created_at: string
+    updated_at: string
+  }
+
   // A case as returned in a client's history (issue #21). No client_id field.
   interface ClientHistoryEntry {
     type: 'CASE' | 'LEAD_OBSERVATION'
