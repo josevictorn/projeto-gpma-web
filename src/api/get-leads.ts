@@ -5,8 +5,12 @@ export interface GetLeadsResponse {
   meta: PaginationMeta
 }
 
-export async function getLeads(page = 1, search?: string) {
-  const params = search ? { page, search } : { page }
+export async function getLeads(page = 1, search?: string, status?: LeadStatus) {
+  const params = {
+    page,
+    ...(search ? { search } : {}),
+    ...(status ? { status } : {}),
+  }
   const response = await api.get<GetLeadsResponse>('/leads', { params })
   return response.data
 }

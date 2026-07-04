@@ -83,7 +83,11 @@ function DashboardPage() {
 
   const { userInfo } = useUser()
 
-  const { data: leadsData } = useQuery({ queryKey: ['leads', 1], queryFn: () => getLeads(1), enabled: userInfo?.role !== 'CLIENT' })
+  const { data: leadsData } = useQuery({
+    queryKey: ['leads', 1, 'NEW'],
+    queryFn: () => getLeads(1, undefined, 'NEW'),
+    enabled: userInfo?.role !== 'CLIENT',
+  })
   const { data: clientsData } = useQuery({ queryKey: ['clients', 1], queryFn: () => getClients(1), enabled: userInfo?.role !== 'CLIENT' })
   const { data: casesData, isLoading: loadingCases } = useQuery({
     queryKey: ['cases', 1],
