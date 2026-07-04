@@ -13,12 +13,14 @@ import {
   Plus,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { createAppointment } from '@/api/create-appointment'
+import { createHearing } from '@/api/create-hearing'
 import { deleteAppointment } from '@/api/delete-appointment'
 import { getAppointments } from '@/api/get-appointments'
+import { getCases } from '@/api/get-cases'
 import { updateAppointment } from '@/api/update-appointment'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,6 +32,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useUser } from '@/contexts/user'
 import { getErrorMessage } from '@/lib/get-error-message'
 import { cn } from '@/lib/utils'
@@ -44,7 +53,16 @@ const appointmentSchema = z.object({
   startsAt: z.string().min(1, 'Data e hora são obrigatórias'),
 })
 
+const hearingSchema = z.object({
+  title: z.string().min(1, 'Título é obrigatório'),
+  caseId: z.string().uuid('Caso é obrigatório'),
+  scheduledAt: z.string().min(1, 'Data e hora são obrigatórias'),
+  courtroom: z.string().optional(),
+  description: z.string().optional(),
+})
+
 type AppointmentForm = z.infer<typeof appointmentSchema>
+type HearingForm = z.infer<typeof hearingSchema>
 
 const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const monthLabels = [
@@ -178,6 +196,127 @@ function CreateAppointmentDialog({
   )
 }
 
+function CreateHearingDialog({
+  open,
+  onClose,
+  defaultDate,
+  cases,
+}: {
+  open: boolean
+  onClose: () => void
+  defaultDate: Date
+  cases: Case[]
+}) {
+  const queryClient = useQueryClient()
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    formState: { errors },
+  } = useForm<HearingForm>({
+    resolver: zodResolver(hearingSchema),
+    defaultValues: {
+      title: '',
+      caseId: '',
+      scheduledAt: toLocalDateTimeInputValue(defaultDate),
+      courtroom: '',
+      description: '',
+    },
+  })
+
+  useEffect(() => {
+    if (open) {
+      reset({
+        title: '',
+        caseId: '',
+        scheduledAt: toLocalDateTimeInputValue(defaultDate),
+        courtroom: '',
+        description: '',
+      })
+    }
+  }, [defaultDate, open, reset])
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: (data: HearingForm) =>
+      createHearing({
+        title: data.title,
+        caseId: data.caseId,
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        courtroom: data.courtroom?.trim() || undefined,
+        description: data.description?.trim() || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] })
+      toast.success('Audiência registrada com sucesso.')
+      onClose()
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, 'Erro ao registrar audiência.'))
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nova audiência</DialogTitle>
+          <DialogDescription>
+            Registre uma audiência para acompanhar compromissos processuais.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4">
+          <Field label="Título" error={errors.title?.message}>
+            <Input {...register('title')} placeholder="Ex: Audiência de instrução" />
+          </Field>
+          <Field label="Caso" error={errors.caseId?.message}>
+            <Controller
+              name="caseId"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione um caso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cases.map((legalCase) => (
+                      <SelectItem key={legalCase.id} value={legalCase.id}>
+                        {legalCase.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </Field>
+          <Field label="Data e hora" error={errors.scheduledAt?.message}>
+            <Input {...register('scheduledAt')} type="datetime-local" />
+          </Field>
+          <Field label="Sala/Local" error={errors.courtroom?.message}>
+            <Input {...register('courtroom')} placeholder="Opcional" />
+          </Field>
+          <Field label="Descrição" error={errors.description?.message}>
+            <textarea
+              {...register('description')}
+              rows={3}
+              className="min-h-[84px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="Opcional"
+            />
+          </Field>
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Salvando...' : 'Salvar audiência'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 interface DeleteAppointmentDialogProps {
   appointment: Appointment | null
   open: boolean
@@ -229,6 +368,7 @@ function AgendaPage() {
   const { userInfo } = useUser()
   const canManage = userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER'
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [hearingDialogOpen, setHearingDialogOpen] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()))
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
@@ -242,6 +382,14 @@ function AgendaPage() {
     queryFn: () => getAppointments(month, year),
     enabled: canManage,
   })
+
+  const { data: casesData } = useQuery({
+    queryKey: ['cases', 1],
+    queryFn: () => getCases(1),
+    enabled: canManage,
+  })
+
+  const cases = casesData?.results ?? []
 
   const appointmentsByDay = useMemo(() => {
     const grouped = new Map<string, Appointment[]>()
@@ -279,10 +427,16 @@ function AgendaPage() {
             Organize compromissos e visualize a agenda mensal.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="size-3.5" />
-          Novo compromisso
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setHearingDialogOpen(true)}>
+            <Plus className="size-3.5" />
+            Nova audiência
+          </Button>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="size-3.5" />
+            Novo compromisso
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_380px]">
@@ -475,6 +629,13 @@ function AgendaPage() {
         }}
         defaultDate={selectedDate}
         appointment={editingAppointment}
+      />
+
+      <CreateHearingDialog
+        open={hearingDialogOpen}
+        onClose={() => setHearingDialogOpen(false)}
+        defaultDate={selectedDate}
+        cases={cases}
       />
 
       <DeleteAppointmentDialog
