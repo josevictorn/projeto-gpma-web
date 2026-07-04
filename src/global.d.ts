@@ -100,6 +100,25 @@ declare global {
     updated_at: string
   }
 
+  type ContractFeeType = 'FIXED' | 'HOURLY' | 'SUCCESS' | 'MIXED'
+  type ContractStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED'
+
+  interface Contract {
+    id: string
+    contract_number: string
+    lawyer_id: string
+    client_id: string
+    case_id: string
+    signed_at: string
+    service_description: string
+    fee_type: ContractFeeType
+    fee_value: number
+    payment_terms: string
+    status: ContractStatus
+    created_at: string
+    updated_at: string
+  }
+
   interface Appointment {
     id: string
     title: string

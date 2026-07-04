@@ -1,11 +1,788 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { FeatureInDevelopment } from '@/components/feature-in-development'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
+import { toast } from 'sonner'
+import { z } from 'zod'
+import {
+  createContract,
+  type ContractFeeType,
+  type ContractStatus,
+} from '@/api/create-contract'
+import { deleteContract } from '@/api/delete-contract'
+import { getCases } from '@/api/get-cases'
+import { getClients } from '@/api/get-clients'
+import { getContracts } from '@/api/get-contracts'
+import { getUsers } from '@/api/get-users'
+import { updateContract } from '@/api/update-contract'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+import { useUser } from '@/contexts/user'
+import { getErrorMessage } from '@/lib/get-error-message'
 
 export const Route = createFileRoute('/_app/financial/contracts')({
-  component: () => (
-    <FeatureInDevelopment
-      title="Contratos"
-      description="A tela de contratos ainda está em desenvolvimento."
-    />
-  ),
+  component: ContractsPage,
+  validateSearch: z.object({
+    page: z.number().int().min(1).catch(1),
+    search: z.string().optional(),
+  }),
 })
+
+const statusLabel: Record<ContractStatus, string> = {
+  DRAFT: 'Rascunho',
+  ACTIVE: 'Ativo',
+  CLOSED: 'Encerrado',
+}
+
+const feeTypeLabel: Record<ContractFeeType, string> = {
+  FIXED: 'Fixo',
+  HOURLY: 'Hora',
+  SUCCESS: 'Êxito',
+  MIXED: 'Misto',
+}
+
+function StatusBadge({ status }: { status: ContractStatus }) {
+  const className =
+    status === 'ACTIVE'
+      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+      : status === 'DRAFT'
+        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+        : 'bg-muted text-muted-foreground border-border'
+
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${className}`}>
+      {statusLabel[status]}
+    </span>
+  )
+}
+
+const contractSchema = z.object({
+  contractNumber: z.string().min(1, 'Número do contrato é obrigatório'),
+  lawyerId: z.string().uuid('Advogado é obrigatório'),
+  clientId: z.string().uuid('Cliente é obrigatório'),
+  caseId: z.string().uuid('Caso é obrigatório'),
+  signedAt: z.string().min(1, 'Data de assinatura é obrigatória'),
+  serviceDescription: z.string().min(1, 'Objeto do contrato é obrigatório'),
+  feeType: z.enum(['FIXED', 'HOURLY', 'SUCCESS', 'MIXED']),
+  feeValue: z.number().positive('Valor de honorários deve ser maior que zero'),
+  paymentTerms: z.string().min(1, 'Condição de pagamento é obrigatória'),
+  status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']),
+})
+
+type ContractForm = z.infer<typeof contractSchema>
+
+const emptyContract: ContractForm = {
+  contractNumber: '',
+  lawyerId: '',
+  clientId: '',
+  caseId: '',
+  signedAt: '',
+  serviceDescription: '',
+  feeType: 'FIXED',
+  feeValue: 0,
+  paymentTerms: '',
+  status: 'ACTIVE',
+}
+
+function contractToForm(contract: Contract): ContractForm {
+  const signedDate = new Date(contract.signed_at)
+
+  const year = signedDate.getFullYear()
+  const month = String(signedDate.getMonth() + 1).padStart(2, '0')
+  const day = String(signedDate.getDate()).padStart(2, '0')
+
+  return {
+    contractNumber: contract.contract_number,
+    lawyerId: contract.lawyer_id,
+    clientId: contract.client_id,
+    caseId: contract.case_id,
+    signedAt: `${year}-${month}-${day}`,
+    serviceDescription: contract.service_description,
+    feeType: contract.fee_type,
+    feeValue: contract.fee_value,
+    paymentTerms: contract.payment_terms,
+    status: contract.status,
+  }
+}
+
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string
+  error?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium">{label}</p>
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function ContractFormDialog({
+  open,
+  onClose,
+  contract,
+  lawyers,
+  clients,
+  cases,
+}: {
+  open: boolean
+  onClose: () => void
+  contract: Contract | null
+  lawyers: User[]
+  clients: Client[]
+  cases: Case[]
+}) {
+  const queryClient = useQueryClient()
+  const isEditing = !!contract
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    control,
+    watch,
+    reset,
+  } = useForm<ContractForm>({
+    resolver: zodResolver(contractSchema),
+    defaultValues: emptyContract,
+  })
+
+  useEffect(() => {
+    if (open) {
+      reset(contract ? contractToForm(contract) : emptyContract)
+    }
+  }, [contract, open, reset])
+
+  const selectedClientId = watch('clientId')
+  const availableCases = useMemo(
+    () => cases.filter((item) => item.client_id === selectedClientId),
+    [cases, selectedClientId]
+  )
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      return
+    }
+
+    const currentCaseId = watch('caseId')
+    const validCase = availableCases.some((item) => item.id === currentCaseId)
+
+    if (!validCase) {
+      reset({
+        ...watch(),
+        caseId: '',
+      })
+    }
+  }, [availableCases, reset, selectedClientId, watch])
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: (data: ContractForm) => {
+      const payload = {
+        contractNumber: data.contractNumber,
+        lawyerId: data.lawyerId,
+        clientId: data.clientId,
+        caseId: data.caseId,
+        signedAt: new Date(data.signedAt).toISOString(),
+        serviceDescription: data.serviceDescription,
+        feeType: data.feeType,
+        feeValue: data.feeValue,
+        paymentTerms: data.paymentTerms,
+        status: data.status,
+      }
+
+      if (contract) {
+        return updateContract(contract.id, payload)
+      }
+
+      return createContract(payload)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] })
+      toast.success(
+        isEditing
+          ? 'Contrato atualizado com sucesso.'
+          : 'Contrato criado com sucesso.'
+      )
+      reset(emptyContract)
+      onClose()
+    },
+    onError: (error) => {
+      toast.error(
+        getErrorMessage(
+          error,
+          isEditing ? 'Erro ao atualizar contrato.' : 'Erro ao criar contrato.'
+        )
+      )
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? 'Editar contrato' : 'Novo contrato'}</DialogTitle>
+          <DialogDescription>
+            {isEditing
+              ? 'Atualize os dados do contrato selecionado.'
+              : 'Preencha os dados obrigatórios para formalizar o contrato com o cliente.'}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Número do contrato" error={errors.contractNumber?.message}>
+              <Input {...register('contractNumber')} placeholder="Ex: CTR-2026-001" />
+            </Field>
+            <Field label="Data de assinatura" error={errors.signedAt?.message}>
+              <Input {...register('signedAt')} type="date" />
+            </Field>
+            <Field label="Advogado associado" error={errors.lawyerId?.message}>
+              <Controller
+                name="lawyerId"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lawyers.map((lawyer) => (
+                        <SelectItem key={lawyer.id} value={lawyer.id}>
+                          {lawyer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Cliente" error={errors.clientId?.message}>
+              <Controller
+                name="clientId"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Caso" error={errors.caseId?.message}>
+              <Controller
+                name="caseId"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableCases.map((legalCase) => (
+                        <SelectItem key={legalCase.id} value={legalCase.id}>
+                          {legalCase.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Tipo de honorário" error={errors.feeType?.message}>
+              <Controller
+                name="feeType"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(feeTypeLabel).map((feeType) => (
+                        <SelectItem key={feeType} value={feeType}>
+                          {feeTypeLabel[feeType as ContractFeeType]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Valor de honorários (R$)" error={errors.feeValue?.message}>
+              <Input
+                {...register('feeValue', { valueAsNumber: true })}
+                type="number"
+                step="0.01"
+                min="0"
+              />
+            </Field>
+            <Field label="Status" error={errors.status?.message}>
+              <Controller
+                name="status"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(statusLabel).map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {statusLabel[status as ContractStatus]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+          </div>
+
+          <Field label="Objeto do contrato" error={errors.serviceDescription?.message}>
+            <textarea
+              {...register('serviceDescription')}
+              rows={3}
+              className="min-h-[96px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="Descreva os serviços jurídicos contratados"
+            />
+          </Field>
+
+          <Field label="Condição de pagamento" error={errors.paymentTerms?.message}>
+            <Input {...register('paymentTerms')} placeholder="Ex: 30% entrada + 3 parcelas mensais" />
+          </Field>
+
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Salvando...' : isEditing ? 'Salvar alterações' : 'Salvar contrato'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CloseContractDialog({
+  contract,
+  open,
+  onClose,
+}: {
+  contract: Contract | null
+  open: boolean
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: () => updateContract(contract!.id, { status: 'CLOSED' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] })
+      toast.success('Contrato encerrado com sucesso.')
+      onClose()
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, 'Erro ao encerrar contrato.'))
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Encerrar contrato</DialogTitle>
+          <DialogDescription>
+            Ao encerrar, o contrato <span className="font-medium text-foreground">{contract?.contract_number}</span> ficará inativo.
+            Esta ação pode ser revertida editando o status para ativo.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
+            Cancelar
+          </Button>
+          <Button variant="destructive" onClick={() => mutate()} disabled={isPending}>
+            {isPending ? 'Encerrando...' : 'Encerrar contrato'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteContractDialog({
+  contract,
+  open,
+  onClose,
+}: {
+  contract: Contract | null
+  open: boolean
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: () => deleteContract(contract!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] })
+      toast.success('Contrato removido com sucesso.')
+      onClose()
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, 'Erro ao excluir contrato.'))
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Excluir contrato</DialogTitle>
+          <DialogDescription>
+            Tem certeza que deseja excluir o contrato{' '}
+            <span className="font-medium text-foreground">{contract?.contract_number}</span>?
+            Esta ação não pode ser desfeita.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
+            Cancelar
+          </Button>
+          <Button variant="destructive" onClick={() => mutate()} disabled={isPending}>
+            {isPending ? 'Excluindo...' : 'Excluir contrato'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ContractsPage() {
+  const navigate = useNavigate()
+  const { userInfo } = useUser()
+  const [editingContract, setEditingContract] = useState<Contract | null>(null)
+  const [closingContract, setClosingContract] = useState<Contract | null>(null)
+  const [deletingContract, setDeletingContract] = useState<Contract | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const { page, search } = Route.useSearch()
+  const [searchTerm, setSearchTerm] = useState(search ?? '')
+
+  useEffect(() => {
+    setSearchTerm(search ?? '')
+  }, [search])
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['contracts', page, search],
+    queryFn: () => getContracts(page, search),
+    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+  })
+
+  const { data: usersData } = useQuery({
+    queryKey: ['users', 1],
+    queryFn: () => getUsers(1),
+    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+  })
+
+  const { data: clientsData } = useQuery({
+    queryKey: ['clients', 1],
+    queryFn: () => getClients(1),
+    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+  })
+
+  const { data: casesData } = useQuery({
+    queryKey: ['cases', 1],
+    queryFn: () => getCases(1),
+    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+  })
+
+  const lawyers = useMemo(
+    () => (usersData?.results ?? []).filter((user) => user.role === 'LAWYER'),
+    [usersData]
+  )
+  const clients = clientsData?.results ?? []
+  const cases = casesData?.results ?? []
+
+  const contracts = data?.results ?? []
+  const meta = data?.meta
+
+  const lawyerMap = useMemo(
+    () => new Map(lawyers.map((lawyer) => [lawyer.id, lawyer.name])),
+    [lawyers]
+  )
+  const clientMap = useMemo(
+    () => new Map(clients.map((client) => [client.id, client.name])),
+    [clients]
+  )
+  const caseMap = useMemo(
+    () => new Map(cases.map((legalCase) => [legalCase.id, legalCase.title])),
+    [cases]
+  )
+
+  if (userInfo?.role === 'CLIENT') {
+    return (
+      <div className="p-6">
+        <h1 className="text-xl font-semibold tracking-tight">Contratos</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Contratos não estão disponíveis para seu perfil.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Contratos</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Formalize acordos de prestação de serviços com seus clientes.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex w-full items-center gap-2 sm:w-[320px]">
+            <Input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Buscar por número ou objeto"
+              className="w-full"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  navigate({
+                    to: '/financial/contracts',
+                    search: { page: 1, search: searchTerm.trim() || undefined },
+                  })
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                navigate({
+                  to: '/financial/contracts',
+                  search: { page: 1, search: searchTerm.trim() || undefined },
+                })
+              }
+              className="whitespace-nowrap"
+            >
+              <Search className="mr-2 size-3.5" />
+              Buscar
+            </Button>
+          </div>
+          <div className="flex gap-2 sm:justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setSearchTerm('')
+                navigate({ to: '/financial/contracts', search: { page: 1 } })
+              }}
+              className="w-full sm:w-auto"
+            >
+              Limpar
+            </Button>
+            <Button size="sm" onClick={() => setFormOpen(true)} className="w-full sm:w-auto">
+              <Plus className="size-3.5" />
+              Novo contrato
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card">
+        <div className="flex items-center gap-2 px-5 py-4">
+          <FileText className="size-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">
+            Contratos cadastrados{' '}
+            <span className="ml-1 font-normal text-muted-foreground">({meta?.totalCount ?? 0})</span>
+          </h2>
+        </div>
+        <Separator />
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+            Carregando contratos...
+          </div>
+        ) : contracts.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+            Nenhum contrato cadastrado ainda.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border/60">
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Número</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden md:table-cell">Cliente</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">Advogado</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden xl:table-cell">Caso</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Honorário</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
+                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contracts.map((contract, index) => (
+                <tr
+                  key={contract.id}
+                  className={`transition-colors hover:bg-muted/30 ${index < contracts.length - 1 ? 'border-b border-border/40' : ''}`}
+                >
+                  <td className="px-5 py-3.5 font-medium">{contract.contract_number}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
+                    {clientMap.get(contract.client_id) ?? 'Cliente não encontrado'}
+                  </td>
+                  <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">
+                    {lawyerMap.get(contract.lawyer_id) ?? 'Advogado não encontrado'}
+                  </td>
+                  <td className="px-5 py-3.5 text-muted-foreground hidden xl:table-cell">
+                    {caseMap.get(contract.case_id) ?? 'Caso não encontrado'}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {feeTypeLabel[contract.fee_type]} · R$ {contract.fee_value.toFixed(2)}
+                  </td>
+                  <td className="px-5 py-3.5"><StatusBadge status={contract.status} /></td>
+                  <td className="px-5 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => {
+                          setEditingContract(contract)
+                          setFormOpen(true)
+                        }}
+                        title="Editar contrato"
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      {contract.status !== 'CLOSED' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setClosingContract(contract)}
+                          title="Encerrar contrato"
+                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        >
+                          Encerrar
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeletingContract(contract)}
+                        title="Excluir contrato"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {meta && meta.totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-border/60 px-5 py-3">
+            <span className="text-xs text-muted-foreground">
+              Página {meta.currentPage} de {meta.totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() =>
+                  navigate({
+                    to: '/financial/contracts',
+                    search: { page: page - 1, search },
+                  })
+                }
+              >
+                <ChevronLeft className="size-3.5" />
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= meta.totalPages}
+                onClick={() =>
+                  navigate({
+                    to: '/financial/contracts',
+                    search: { page: page + 1, search },
+                  })
+                }
+              >
+                Próxima
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ContractFormDialog
+        open={formOpen}
+        onClose={() => {
+          setFormOpen(false)
+          setEditingContract(null)
+        }}
+        contract={editingContract}
+        lawyers={lawyers}
+        clients={clients}
+        cases={cases}
+      />
+
+      <CloseContractDialog
+        contract={closingContract}
+        open={!!closingContract}
+        onClose={() => setClosingContract(null)}
+      />
+
+      <DeleteContractDialog
+        contract={deletingContract}
+        open={!!deletingContract}
+        onClose={() => setDeletingContract(null)}
+      />
+    </div>
+  )
+}
