@@ -51,7 +51,10 @@ function DashboardPage() {
   }, [unauthorized])
 
   const { userInfo } = useUser()
-  const canSeeAgenda = userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER'
+  const canSeeAgenda =
+    userInfo?.role === 'ADMIN' ||
+    userInfo?.role === 'LAWYER' ||
+    userInfo?.role === 'CLIENT'
   const now = new Date()
   const month = now.getMonth() + 1
   const year = now.getFullYear()

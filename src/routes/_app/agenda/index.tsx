@@ -367,6 +367,7 @@ function DeleteAppointmentDialog({
 function AgendaPage() {
   const { userInfo } = useUser()
   const canManage = userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER'
+  const canView = canManage || userInfo?.role === 'CLIENT'
   const [dialogOpen, setDialogOpen] = useState(false)
   const [hearingDialogOpen, setHearingDialogOpen] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
@@ -380,7 +381,7 @@ function AgendaPage() {
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments', year, month],
     queryFn: () => getAppointments(month, year),
-    enabled: canManage,
+    enabled: canView,
   })
 
   const { data: casesData } = useQuery({
@@ -407,7 +408,7 @@ function AgendaPage() {
   const calendarDays = useMemo(() => buildCalendarDays(currentMonth), [currentMonth])
   const selectedAppointments = appointmentsByDay.get(toDayKey(selectedDate)) ?? []
 
-  if (!canManage) {
+  if (!canView) {
     return (
       <div className="p-6">
         <h1 className="text-xl font-semibold tracking-tight">Agenda</h1>
@@ -427,16 +428,18 @@ function AgendaPage() {
             Organize compromissos e visualize a agenda mensal.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setHearingDialogOpen(true)}>
-            <Plus className="size-3.5" />
-            Nova audiência
-          </Button>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="size-3.5" />
-            Novo compromisso
-          </Button>
-        </div>
+        {canManage && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setHearingDialogOpen(true)}>
+              <Plus className="size-3.5" />
+              Nova audiência
+            </Button>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="size-3.5" />
+              Novo compromisso
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_380px]">
@@ -584,36 +587,38 @@ function AgendaPage() {
                       Agenda do escritório
                     </span>
                   </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingAppointment(appointment)
-                        setDialogOpen(true)
-                      }}
-                    >
-                      <Pencil className="size-3.5" />
-                      Editar
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        if (editingAppointment?.id === appointment.id) {
-                          setEditingAppointment(null)
-                          setDialogOpen(false)
-                        }
+                  {canManage && (
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingAppointment(appointment)
+                          setDialogOpen(true)
+                        }}
+                      >
+                        <Pencil className="size-3.5" />
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          if (editingAppointment?.id === appointment.id) {
+                            setEditingAppointment(null)
+                            setDialogOpen(false)
+                          }
 
-                        setDeletingAppointment(appointment)
-                      }}
-                    >
-                      <Trash2 className="size-3.5" />
-                      Excluir
-                    </Button>
-                  </div>
+                          setDeletingAppointment(appointment)
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Excluir
+                      </Button>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -621,28 +626,32 @@ function AgendaPage() {
         </section>
       </div>
 
-      <CreateAppointmentDialog
-        open={dialogOpen}
-        onClose={() => {
-          setDialogOpen(false)
-          setEditingAppointment(null)
-        }}
-        defaultDate={selectedDate}
-        appointment={editingAppointment}
-      />
+      {canManage && (
+        <>
+          <CreateAppointmentDialog
+            open={dialogOpen}
+            onClose={() => {
+              setDialogOpen(false)
+              setEditingAppointment(null)
+            }}
+            defaultDate={selectedDate}
+            appointment={editingAppointment}
+          />
 
-      <CreateHearingDialog
-        open={hearingDialogOpen}
-        onClose={() => setHearingDialogOpen(false)}
-        defaultDate={selectedDate}
-        cases={cases}
-      />
+          <CreateHearingDialog
+            open={hearingDialogOpen}
+            onClose={() => setHearingDialogOpen(false)}
+            defaultDate={selectedDate}
+            cases={cases}
+          />
 
-      <DeleteAppointmentDialog
-        appointment={deletingAppointment}
-        open={!!deletingAppointment}
-        onClose={() => setDeletingAppointment(null)}
-      />
+          <DeleteAppointmentDialog
+            appointment={deletingAppointment}
+            open={!!deletingAppointment}
+            onClose={() => setDeletingAppointment(null)}
+          />
+        </>
+      )}
     </div>
   )
 }

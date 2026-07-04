@@ -5,7 +5,7 @@ import { AppSidebar } from '@/components/app-sidebar'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
-  beforeLoad: ({ context }) => {
+  beforeLoad: ({ context, location }) => {
     const isAuthenticated = context?.isAuthenticated
 
     if (!isAuthenticated) {

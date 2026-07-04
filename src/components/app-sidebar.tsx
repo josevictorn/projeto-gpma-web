@@ -136,14 +136,36 @@ interface AppSidebarProps {
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const { userInfo } = useUser()
   const isAdmin = userInfo?.role === 'ADMIN'
+  const isClient = userInfo?.role === 'CLIENT'
 
-  const filteredMainNav = mainNavItems.filter((item) => {
-    if (userInfo?.role === 'CLIENT' || userInfo?.role === 'LAWYER') {
-      // clients and leads are not available for CLIENT or LAWYER users
-      return item.to !== '/leads' && item.to !== '/clients'
-    }
-    return true
-  })
+  const filteredMainNav = isClient
+    ? mainNavItems.filter((item) => {
+        if (item.to === '/dashboard' || item.to === '/cases' || item.to === '/agenda') {
+          return true
+        }
+
+        if (item.to === '/financial') {
+          return true
+        }
+
+        return false
+      }).map((item) => {
+        if (item.to === '/financial') {
+          return {
+            ...item,
+            children: [{ label: 'Pagamentos', to: '/financial/payments' }],
+          }
+        }
+
+        return item
+      })
+    : mainNavItems.filter((item) => {
+        if (userInfo?.role === 'LAWYER') {
+          return item.to !== '/leads' && item.to !== '/clients'
+        }
+
+        return true
+      })
 
   return (
     <aside
@@ -162,16 +184,18 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
           <NavLink key={item.to} item={item} onNavigate={onClose} />
         ))}
 
-        <div className="pt-3">
-          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-            Sistema
-          </p>
-          {systemNavItems.map((item) => (
-            <NavLink key={item.to} item={item} onNavigate={onClose} />
-          ))}
-        </div>
+        {!isClient && (
+          <div className="pt-3">
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+              Sistema
+            </p>
+            {systemNavItems.map((item) => (
+              <NavLink key={item.to} item={item} onNavigate={onClose} />
+            ))}
+          </div>
+        )}
 
-        {isAdmin && (
+        {isAdmin && !isClient && (
           <div className="pt-3">
             <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
               Administração
