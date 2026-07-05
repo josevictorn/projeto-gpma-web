@@ -142,6 +142,23 @@ declare global {
     updated_at: string
   }
 
+  type DocumentCategory = 'PETITION' | 'EVIDENCE' | 'DISPATCH' | 'OTHER'
+
+  interface CaseDocument {
+    id: string
+    case_id: string
+    uploaded_by: string
+    uploaded_by_name: string | null
+    category: DocumentCategory
+    title: string
+    original_filename: string
+    mime_type: string
+    size_bytes: number
+    visible_to_client: boolean
+    created_at: string
+    updated_at: string
+  }
+
   // A case as returned in a client's history (issue #21). No client_id field.
   interface ClientHistoryEntry {
     type: 'CASE' | 'LEAD_OBSERVATION'

@@ -139,7 +139,9 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const isClient = userInfo?.role === 'CLIENT'
   const isLawyer = userInfo?.role === 'LAWYER'
   const filteredSystemNav = isClient
-    ? systemNavItems.filter((item) => item.to === '/settings')
+    ? systemNavItems.filter(
+        (item) => item.to === '/settings' || item.to === '/documents'
+      )
     : systemNavItems
 
   const filteredMainNav = isClient
