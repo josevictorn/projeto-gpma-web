@@ -24,6 +24,7 @@ import { deleteContract } from '@/api/delete-contract'
 import { getCases } from '@/api/get-cases'
 import { getClients } from '@/api/get-clients'
 import { getContracts } from '@/api/get-contracts'
+import { getPaymentMethods } from '@/api/get-payment-methods'
 import { getUsers } from '@/api/get-users'
 import { updateContract } from '@/api/update-contract'
 import { Button } from '@/components/ui/button'
@@ -106,7 +107,7 @@ const contractSchema = z.object({
     .number({ error: 'Informe um valor válido de honorários.' })
     .finite('Informe um valor válido de honorários.')
     .positive('Informe valor maior que zero.'),
-  paymentTerms: z.string().min(1, 'Condição de pagamento é obrigatória'),
+  paymentTerms: z.string().min(1, 'Forma de pagamento é obrigatória'),
   billingType: z.enum(['ONE_TIME', 'MONTHLY', 'INSTALLMENTS']),
   installments: z.number().int().positive('Quantidade de parcelas inválida'),
   firstDueDate: z.string().min(1, 'Primeiro vencimento é obrigatório'),
@@ -212,6 +213,7 @@ function ContractFormDialog({
   lawyers,
   clients,
   cases,
+  paymentMethods,
 }: {
   open: boolean
   onClose: () => void
@@ -219,6 +221,7 @@ function ContractFormDialog({
   lawyers: User[]
   clients: Client[]
   cases: Case[]
+  paymentMethods: PaymentMethod[]
 }) {
   const queryClient = useQueryClient()
   const isEditing = !!contract
@@ -241,9 +244,17 @@ function ContractFormDialog({
   }, [contract, open, reset])
 
   const selectedClientId = watch('clientId')
+  const selectedPaymentMethod = watch('paymentTerms')
   const availableCases = useMemo(
     () => cases.filter((item) => item.client_id === selectedClientId),
     [cases, selectedClientId]
+  )
+  const activePaymentMethods = useMemo(
+    () => paymentMethods.filter((method) => method.is_active),
+    [paymentMethods]
+  )
+  const selectedPaymentMethodExists = activePaymentMethods.some(
+    (method) => method.name === selectedPaymentMethod
   )
 
   useEffect(() => {
@@ -548,8 +559,30 @@ function ContractFormDialog({
             />
           </Field>
 
-          <Field label="Condição de pagamento" error={errors.paymentTerms?.message}>
-            <Input {...register('paymentTerms')} placeholder="Ex: 30% entrada + restante em 3 parcelas" />
+          <Field label="Forma de pagamento" error={errors.paymentTerms?.message}>
+            <Controller
+              name="paymentTerms"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione a forma de pagamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!selectedPaymentMethodExists && field.value && (
+                      <SelectItem value={field.value}>
+                        {field.value} (inativa)
+                      </SelectItem>
+                    )}
+                    {activePaymentMethods.map((method) => (
+                      <SelectItem key={method.id} value={method.name}>
+                        {method.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
 
           <DialogFooter>
@@ -700,12 +733,19 @@ function ContractsPage() {
     enabled: canManageContracts,
   })
 
+  const { data: paymentMethodsData } = useQuery({
+    queryKey: ['payment-methods', 'contracts-form'],
+    queryFn: () => getPaymentMethods(1),
+    enabled: canManageContracts,
+  })
+
   const lawyers = useMemo(
     () => (usersData?.results ?? []).filter((user) => user.role === 'LAWYER'),
     [usersData]
   )
   const clients = clientsData?.results ?? []
   const cases = casesData?.results ?? []
+  const paymentMethods = paymentMethodsData?.results ?? []
 
   const contracts = data?.results ?? []
   const meta = data?.meta
@@ -951,6 +991,7 @@ function ContractsPage() {
           lawyers={lawyers}
           clients={clients}
           cases={cases}
+          paymentMethods={paymentMethods}
         />
       )}
 
