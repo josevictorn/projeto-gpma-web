@@ -76,10 +76,17 @@ const paymentMethodSchema = z.object({
   isActive: z.boolean(),
 })
 
+const paymentMethodTypeOptions = [
+  'Crédito',
+  'Boleto',
+  'Dinheiro',
+  'Pix',
+] as const
+
 type PaymentMethodForm = z.infer<typeof paymentMethodSchema>
 
 const emptyPaymentMethod: PaymentMethodForm = {
-  name: '',
+  name: 'Crédito',
   description: '',
   isActive: true,
 }
@@ -195,8 +202,25 @@ function PaymentMethodFormDialog({ method, open, onClose }: FormDialogProps) {
           onSubmit={handleSubmit((data) => mutate(data))}
           className="space-y-4"
         >
-          <Field label="Nome" error={errors.name?.message}>
-            <Input {...register('name')} placeholder="Ex: Cartão de crédito" />
+          <Field label="Tipo" error={errors.name?.message}>
+            <Controller
+              name="name"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethodTypeOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
           <Field label="Descrição" error={errors.description?.message}>
             <Input
@@ -345,7 +369,7 @@ function PaymentMethodsPage() {
             Formas de Pagamento
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Gerencie as formas de pagamento disponíveis para cobranças.
+            Gerencie os tipos de pagamento disponíveis para cobranças.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
