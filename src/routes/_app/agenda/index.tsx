@@ -366,8 +366,9 @@ function DeleteAppointmentDialog({
 
 function AgendaPage() {
   const { userInfo } = useUser()
-  const canManage = userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER'
-  const canView = canManage || userInfo?.role === 'CLIENT'
+  const canCreateAppointment = userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER'
+  const canCreateHearing = userInfo?.role === 'ADMIN'
+  const canView = canCreateAppointment || userInfo?.role === 'CLIENT'
   const [dialogOpen, setDialogOpen] = useState(false)
   const [hearingDialogOpen, setHearingDialogOpen] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
@@ -387,7 +388,7 @@ function AgendaPage() {
   const { data: casesData } = useQuery({
     queryKey: ['cases', 1],
     queryFn: () => getCases(1),
-    enabled: canManage,
+    enabled: canCreateHearing,
   })
 
   const cases = casesData?.results ?? []
@@ -428,16 +429,20 @@ function AgendaPage() {
             Organize compromissos e visualize a agenda mensal.
           </p>
         </div>
-        {canManage && (
+        {(canCreateAppointment || canCreateHearing) && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setHearingDialogOpen(true)}>
-              <Plus className="size-3.5" />
-              Nova audiência
-            </Button>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="size-3.5" />
-              Novo compromisso
-            </Button>
+            {canCreateHearing && (
+              <Button variant="outline" onClick={() => setHearingDialogOpen(true)}>
+                <Plus className="size-3.5" />
+                Nova audiência
+              </Button>
+            )}
+            {canCreateAppointment && (
+              <Button onClick={() => setDialogOpen(true)}>
+                <Plus className="size-3.5" />
+                Novo compromisso
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -587,7 +592,7 @@ function AgendaPage() {
                       Agenda do escritório
                     </span>
                   </div>
-                  {canManage && (
+                  {(userInfo?.role === 'ADMIN' || !appointment.is_hearing) && canCreateAppointment && (
                     <div className="flex justify-end gap-2">
                       <Button
                         type="button"
@@ -626,7 +631,7 @@ function AgendaPage() {
         </section>
       </div>
 
-      {canManage && (
+      {canCreateAppointment && (
         <>
           <CreateAppointmentDialog
             open={dialogOpen}
@@ -638,12 +643,14 @@ function AgendaPage() {
             appointment={editingAppointment}
           />
 
-          <CreateHearingDialog
-            open={hearingDialogOpen}
-            onClose={() => setHearingDialogOpen(false)}
-            defaultDate={selectedDate}
-            cases={cases}
-          />
+          {canCreateHearing && (
+            <CreateHearingDialog
+              open={hearingDialogOpen}
+              onClose={() => setHearingDialogOpen(false)}
+              defaultDate={selectedDate}
+              cases={cases}
+            />
+          )}
 
           <DeleteAppointmentDialog
             appointment={deletingAppointment}

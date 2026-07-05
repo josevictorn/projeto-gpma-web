@@ -129,6 +129,7 @@ declare global {
     title: string
     description: string | null
     starts_at: string
+    is_hearing: boolean
     created_at: string
     updated_at: string
   }
