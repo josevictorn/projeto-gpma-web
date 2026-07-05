@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Eclipse, Eye, EyeOff } from 'lucide-react'
 import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/auth'
+import { getErrorMessage } from '@/lib/get-error-message'
 import {
   requiredEmail,
   requiredPasswordMinLength,
@@ -49,9 +51,12 @@ function RouteComponent() {
   })
 
   async function handleSignIn(data: SignInForm) {
-    await login.mutateAsync(data)
-
-    navigate({ to: '/dashboard' })
+    try {
+      await login.mutateAsync(data)
+      navigate({ to: '/dashboard' })
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Não foi possível autenticar.'))
+    }
   }
 
   const [showPassword, setShowPassword] = React.useState(false)

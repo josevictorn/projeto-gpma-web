@@ -28,8 +28,10 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     const status = error.response?.status
+    const requestUrl = error.config?.url ?? ''
+    const isAuthenticateRequest = requestUrl.includes('/users/authenticate')
 
-    if (status === 401) {
+    if (status === 401 && !isAuthenticateRequest) {
       storage.local.delete(constants.localStorageKeys.ACCESS_TOKEN)
       queryClient.clear()
       window.location.href = '/sign-in'

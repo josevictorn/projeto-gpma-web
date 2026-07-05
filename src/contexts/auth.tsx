@@ -5,7 +5,6 @@ import {
 } from '@tanstack/react-query'
 import type { AxiosError } from 'axios'
 import { createContext, useCallback, useContext, useState } from 'react'
-import { toast } from 'sonner'
 import {
   type AuthenticateBody,
   type AuthenticateResponse,
@@ -58,13 +57,15 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsAuthenticated(true)
   }
 
-  const requestLogin = useMutation({
+  const requestLogin = useMutation<
+    AuthenticateResponse,
+    // biome-ignore lint/suspicious/noExplicitAny: We want to allow any error type here since the API might return different error shapes.
+    AxiosError<unknown, any>,
+    AuthenticateBody,
+    unknown
+  >({
     mutationFn: authenticate,
     onSuccess: handleLogin,
-    onError: (error: AxiosError) => {
-      const errorResponse = error.response?.data as ErrorResponse | undefined
-      toast.error(errorResponse?.message)
-    },
   })
 
   const logout = handleLogout
