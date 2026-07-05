@@ -46,7 +46,7 @@ function CaseDetailPage() {
   const { data: clients } = useQuery({
     queryKey: ['clients', 'all'],
     queryFn: getAllClients,
-    enabled: userInfo?.role === 'ADMIN',
+    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
   })
 
   const clientName = clients?.find((client) => client.id === caseItem?.client_id)?.name
