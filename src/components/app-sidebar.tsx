@@ -138,6 +138,9 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const isAdmin = userInfo?.role === 'ADMIN'
   const isClient = userInfo?.role === 'CLIENT'
   const isLawyer = userInfo?.role === 'LAWYER'
+  const filteredSystemNav = isClient
+    ? systemNavItems.filter((item) => item.to === '/settings')
+    : systemNavItems
 
   const filteredMainNav = isClient
     ? mainNavItems.filter((item) => {
@@ -200,12 +203,12 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
           <NavLink key={item.to} item={item} onNavigate={onClose} />
         ))}
 
-        {!isClient && (
+        {filteredSystemNav.length > 0 && (
           <div className="pt-3">
             <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
               Sistema
             </p>
-            {systemNavItems.map((item) => (
+            {filteredSystemNav.map((item) => (
               <NavLink key={item.to} item={item} onNavigate={onClose} />
             ))}
           </div>
