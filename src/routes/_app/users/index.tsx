@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { formatCpf, isValidCpf, onlyDigits } from '@/utils/input-masks'
 
 export const Route = createFileRoute('/_app/users/')({
   component: UsersPage,
@@ -138,8 +139,8 @@ const createUserSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   cpf: z
     .string()
-    .transform((value) => value.replace(/\D/g, ''))
-    .refine((value) => value.length === 11, 'CPF inválido'),
+    .refine((value) => isValidCpf(value), 'CPF inválido. Use o formato 000.000.000-00')
+    .transform((value) => onlyDigits(value)),
   email: z.string().email('E-mail inválido'),
   password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
   role: z.enum(['ADMIN', 'LAWYER', 'CLIENT']),
@@ -200,7 +201,16 @@ function CreateUserDialog({ open, onClose }: CreateUserDialogProps) {
           </div>
           <div className="space-y-1.5">
             <p className="text-sm font-medium">CPF</p>
-            <Input {...register('cpf')} placeholder="000.000.000-00" />
+            <Input
+              {...register('cpf', {
+                onChange: (event) => {
+                  event.target.value = formatCpf(event.target.value)
+                },
+              })}
+              inputMode="numeric"
+              maxLength={14}
+              placeholder="000.000.000-00"
+            />
             {errors.cpf && <p className="text-xs text-destructive">{errors.cpf.message}</p>}
           </div>
           <div className="space-y-1.5">

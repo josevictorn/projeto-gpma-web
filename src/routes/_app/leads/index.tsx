@@ -31,6 +31,16 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { getErrorMessage } from '@/lib/get-error-message'
+import {
+  formatCepRn,
+  formatCpf,
+  formatPhoneBr,
+  formatRg,
+  isValidCepRn,
+  isValidCpf,
+  isValidPhoneBr,
+  isValidRg,
+} from '@/utils/input-masks'
 
 export const Route = createFileRoute('/_app/leads/')({
   component: LeadsPage,
@@ -87,7 +97,7 @@ function StatusBadge({ status }: { status: LeadStatus }) {
 const leadSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   email: z.string().email('E-mail inválido'),
-  phone: z.string().min(8, 'Telefone inválido'),
+  phone: z.string().refine((value) => isValidPhoneBr(value), 'Telefone inválido. Use (84) 99999-9999 ou (84) 1111-1111'),
   status: z.enum(['NEW', 'CONTRACTED', 'LOST']),
   maritalStatus: z.string().optional(),
   profession: z.string().optional(),
@@ -108,15 +118,15 @@ const leadSchema = z.object({
   const requiredFields: Array<[keyof typeof data, string, ((value: string) => boolean)?]> = [
     ['maritalStatus', 'Estado civil é obrigatório'],
     ['profession', 'Profissão é obrigatória'],
-    ['cpf', 'CPF inválido', (value) => value.trim().length >= 11],
-    ['rg', 'RG é obrigatório'],
+    ['cpf', 'CPF inválido. Use 000.000.000-00', (value) => isValidCpf(value)],
+    ['rg', 'RG inválido. Use 000.000.000 ou 000.000.000-00', (value) => isValidRg(value)],
     ['issuingAgency', 'Órgão emissor é obrigatório'],
     ['street', 'Logradouro é obrigatório'],
     ['number', 'Número é obrigatório'],
     ['neighborhood', 'Bairro é obrigatório'],
     ['city', 'Cidade é obrigatória'],
     ['state', 'Estado é obrigatório'],
-    ['zipCode', 'CEP inválido', (value) => value.trim().length >= 8],
+    ['zipCode', 'CEP inválido. Use 59000-000', (value) => isValidCepRn(value)],
   ]
 
   for (const [field, message, validator] of requiredFields) {
@@ -173,7 +183,7 @@ function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
           ? {
               name: lead.name,
               email: lead.email,
-              phone: lead.phone,
+              phone: formatPhoneBr(lead.phone),
               status: lead.status === 'CONTACTED' || lead.status === 'QUALIFIED' || lead.status === 'COMPLETED'
                 ? 'NEW'
                 : lead.status,
@@ -216,7 +226,7 @@ function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
         return convertLeadToClient(lead.id, {
           name: data.name,
           email: data.email,
-          phone: data.phone,
+            phone: data.phone,
           maritalStatus: data.maritalStatus ?? '',
           profession: data.profession ?? '',
           cpf: data.cpf ?? '',
@@ -307,7 +317,16 @@ function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
           </div>
           <div className="space-y-1.5">
             <p className="text-sm font-medium">Telefone</p>
-            <Input {...register('phone')} placeholder="(84) 99999-9999" />
+            <Input
+              {...register('phone', {
+                onChange: (event) => {
+                  event.target.value = formatPhoneBr(event.target.value)
+                },
+              })}
+              inputMode="numeric"
+              maxLength={15}
+              placeholder="(84) 99999-9999"
+            />
             {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
           </div>
           {isEditing ? (
@@ -359,12 +378,30 @@ function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
                 </div>
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium">CPF</p>
-                  <Input {...register('cpf')} placeholder="000.000.000-00" />
+                  <Input
+                    {...register('cpf', {
+                      onChange: (event) => {
+                        event.target.value = formatCpf(event.target.value)
+                      },
+                    })}
+                    inputMode="numeric"
+                    maxLength={14}
+                    placeholder="000.000.000-00"
+                  />
                   {errors.cpf && <p className="text-xs text-destructive">{errors.cpf.message}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium">RG</p>
-                  <Input {...register('rg')} placeholder="0000000" />
+                  <Input
+                    {...register('rg', {
+                      onChange: (event) => {
+                        event.target.value = formatRg(event.target.value)
+                      },
+                    })}
+                    inputMode="numeric"
+                    maxLength={14}
+                    placeholder="000.000.000 ou 000.000.000-00"
+                  />
                   {errors.rg && <p className="text-xs text-destructive">{errors.rg.message}</p>}
                 </div>
                 <div className="space-y-1.5">
@@ -374,7 +411,16 @@ function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
                 </div>
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium">CEP</p>
-                  <Input {...register('zipCode')} placeholder="00000-000" />
+                  <Input
+                    {...register('zipCode', {
+                      onChange: (event) => {
+                        event.target.value = formatCepRn(event.target.value)
+                      },
+                    })}
+                    inputMode="numeric"
+                    maxLength={9}
+                    placeholder="59000-000"
+                  />
                   {errors.zipCode && <p className="text-xs text-destructive">{errors.zipCode.message}</p>}
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">

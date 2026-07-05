@@ -25,6 +25,16 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { getErrorMessage } from '@/lib/get-error-message'
 import { StatusBadge } from '@/routes/_app/cases/-case-status'
+import {
+  formatCepRn,
+  formatCpf,
+  formatPhoneBr,
+  formatRg,
+  isValidCepRn,
+  isValidCpf,
+  isValidPhoneBr,
+  isValidRg,
+} from '@/utils/input-masks'
 
 export const Route = createFileRoute('/_app/clients/')({
   component: ClientsPage,
@@ -39,18 +49,18 @@ export const Route = createFileRoute('/_app/clients/')({
 const clientSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   email: z.string().email('E-mail inválido'),
-  phone: z.string().min(8, 'Telefone inválido'),
+  phone: z.string().refine((value) => isValidPhoneBr(value), 'Telefone inválido. Use (84) 99999-9999 ou (84) 1111-1111'),
   maritalStatus: z.string().min(1, 'Campo obrigatório'),
   profession: z.string().min(1, 'Campo obrigatório'),
-  cpf: z.string().min(11, 'CPF inválido'),
-  rg: z.string().min(1, 'Campo obrigatório'),
+  cpf: z.string().refine((value) => isValidCpf(value), 'CPF inválido. Use 000.000.000-00'),
+  rg: z.string().refine((value) => isValidRg(value), 'RG inválido. Use 000.000.000 ou 000.000.000-00'),
   issuingAgency: z.string().min(1, 'Campo obrigatório'),
   street: z.string().min(1, 'Campo obrigatório'),
   number: z.string().min(1, 'Campo obrigatório'),
   neighborhood: z.string().min(1, 'Campo obrigatório'),
   city: z.string().min(1, 'Campo obrigatório'),
   state: z.string().min(1, 'Campo obrigatório'),
-  zipCode: z.string().min(8, 'CEP inválido'),
+  zipCode: z.string().refine((value) => isValidCepRn(value), 'CEP inválido. Use 59000-000'),
 })
 
 type ClientForm = z.infer<typeof clientSchema>
@@ -65,18 +75,18 @@ function clientToForm(client: Client): ClientForm {
   return {
     name: client.name,
     email: client.email,
-    phone: client.phone,
+    phone: formatPhoneBr(client.phone),
     maritalStatus: client.marital_status,
     profession: client.profession,
-    cpf: client.cpf,
-    rg: client.rg,
+    cpf: formatCpf(client.cpf),
+    rg: formatRg(client.rg),
     issuingAgency: client.issuing_agency,
     street: client.street,
     number: client.number,
     neighborhood: client.neighborhood,
     city: client.city,
     state: client.state,
-    zipCode: client.zip_code,
+    zipCode: formatCepRn(client.zip_code),
   }
 }
 
@@ -155,7 +165,16 @@ function ClientFormDialog({ client, open, onClose }: ClientFormDialogProps) {
                 <Input {...register('email')} type="email" placeholder="email@exemplo.com" />
               </Field>
               <Field label="Telefone" error={errors.phone?.message}>
-                <Input {...register('phone')} placeholder="(84) 99999-9999" />
+                <Input
+                  {...register('phone', {
+                    onChange: (event) => {
+                      event.target.value = formatPhoneBr(event.target.value)
+                    },
+                  })}
+                  inputMode="numeric"
+                  maxLength={15}
+                  placeholder="(84) 99999-9999"
+                />
               </Field>
               <Field label="Estado civil" error={errors.maritalStatus?.message}>
                 <Input {...register('maritalStatus')} placeholder="Ex: Solteiro(a)" />
@@ -171,10 +190,28 @@ function ClientFormDialog({ client, open, onClose }: ClientFormDialogProps) {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documentos</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Field label="CPF" error={errors.cpf?.message}>
-                <Input {...register('cpf')} placeholder="000.000.000-00" />
+                <Input
+                  {...register('cpf', {
+                    onChange: (event) => {
+                      event.target.value = formatCpf(event.target.value)
+                    },
+                  })}
+                  inputMode="numeric"
+                  maxLength={14}
+                  placeholder="000.000.000-00"
+                />
               </Field>
               <Field label="RG" error={errors.rg?.message}>
-                <Input {...register('rg')} placeholder="0000000" />
+                <Input
+                  {...register('rg', {
+                    onChange: (event) => {
+                      event.target.value = formatRg(event.target.value)
+                    },
+                  })}
+                  inputMode="numeric"
+                  maxLength={14}
+                  placeholder="000.000.000 ou 000.000.000-00"
+                />
               </Field>
               <Field label="Órgão emissor" error={errors.issuingAgency?.message}>
                 <Input {...register('issuingAgency')} placeholder="Ex: SSP/RN" />
@@ -213,7 +250,16 @@ function ClientFormDialog({ client, open, onClose }: ClientFormDialogProps) {
               </div>
               <div className="sm:col-span-4">
                 <Field label="CEP" error={errors.zipCode?.message}>
-                  <Input {...register('zipCode')} placeholder="00000-000" />
+                  <Input
+                    {...register('zipCode', {
+                      onChange: (event) => {
+                        event.target.value = formatCepRn(event.target.value)
+                      },
+                    })}
+                    inputMode="numeric"
+                    maxLength={9}
+                    placeholder="59000-000"
+                  />
                 </Field>
               </div>
             </div>
