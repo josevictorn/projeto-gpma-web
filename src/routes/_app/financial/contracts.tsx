@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import {
   ChevronLeft,
   ChevronRight,
@@ -49,6 +49,11 @@ import { getErrorMessage } from '@/lib/get-error-message'
 
 export const Route = createFileRoute('/_app/financial/contracts')({
   component: ContractsPage,
+  beforeLoad: ({ context }) => {
+    if (context.userRole !== 'ADMIN' && context.userRole !== 'LAWYER') {
+      throw redirect({ to: '/dashboard', search: { unauthorized: true } })
+    }
+  },
   validateSearch: z.object({
     page: z.number().int().min(1).catch(1),
     search: z.string().optional(),
@@ -657,6 +662,9 @@ function DeleteContractDialog({
 function ContractsPage() {
   const navigate = useNavigate()
   const { userInfo } = useUser()
+  const isAdmin = userInfo?.role === 'ADMIN'
+  const canViewContracts = userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER'
+  const canManageContracts = isAdmin
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [closingContract, setClosingContract] = useState<Contract | null>(null)
   const [deletingContract, setDeletingContract] = useState<Contract | null>(null)
@@ -671,25 +679,25 @@ function ContractsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['contracts', page, search],
     queryFn: () => getContracts(page, search),
-    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+    enabled: canViewContracts,
   })
 
   const { data: usersData } = useQuery({
     queryKey: ['users', 1],
     queryFn: () => getUsers(1),
-    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+    enabled: canManageContracts,
   })
 
   const { data: clientsData } = useQuery({
     queryKey: ['clients', 1],
     queryFn: () => getClients(1),
-    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+    enabled: canManageContracts,
   })
 
   const { data: casesData } = useQuery({
     queryKey: ['cases', 1],
     queryFn: () => getCases(1),
-    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+    enabled: canManageContracts,
   })
 
   const lawyers = useMemo(
@@ -715,7 +723,7 @@ function ContractsPage() {
     [cases]
   )
 
-  if (userInfo?.role === 'CLIENT') {
+  if (!canViewContracts) {
     return (
       <div className="p-6">
         <h1 className="text-xl font-semibold tracking-tight">Contratos</h1>
@@ -732,7 +740,9 @@ function ContractsPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Contratos</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Formalize acordos de prestação de serviços com seus clientes.
+            {canManageContracts
+              ? 'Formalize acordos de prestação de serviços com seus clientes.'
+              : 'Visualize os contratos em que você está associado.'}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -779,13 +789,21 @@ function ContractsPage() {
             >
               Limpar
             </Button>
-            <Button size="sm" onClick={() => setFormOpen(true)} className="w-full sm:w-auto">
-              <Plus className="size-3.5" />
-              Novo contrato
-            </Button>
+            {canManageContracts && (
+              <Button size="sm" onClick={() => setFormOpen(true)} className="w-full sm:w-auto">
+                <Plus className="size-3.5" />
+                Novo contrato
+              </Button>
+            )}
           </div>
         </div>
       </div>
+
+      {!canManageContracts && (
+        <div className="rounded-md border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          Seu perfil possui acesso somente leitura aos contratos vinculados a você.
+        </div>
+      )}
 
       <div className="rounded-lg border border-border bg-card">
         <div className="flex items-center gap-2 px-5 py-4">
@@ -815,7 +833,9 @@ function ContractsPage() {
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden xl:table-cell">Caso</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Honorário</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
-                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Ações</th>
+                {canManageContracts && (
+                  <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Ações</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -826,53 +846,55 @@ function ContractsPage() {
                 >
                   <td className="px-5 py-3.5 font-medium">{contract.contract_number}</td>
                   <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                    {clientMap.get(contract.client_id) ?? 'Cliente não encontrado'}
+                    {clientMap.get(contract.client_id) ?? contract.client_id}
                   </td>
                   <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">
-                    {lawyerMap.get(contract.lawyer_id) ?? 'Advogado não encontrado'}
+                    {lawyerMap.get(contract.lawyer_id) ?? contract.lawyer_id}
                   </td>
                   <td className="px-5 py-3.5 text-muted-foreground hidden xl:table-cell">
-                    {caseMap.get(contract.case_id) ?? 'Caso não encontrado'}
+                    {caseMap.get(contract.case_id) ?? contract.case_id}
                   </td>
                   <td className="px-5 py-3.5">
                     {feeTypeLabel[contract.fee_type]} · R$ {contract.fee_value.toFixed(2)}
                   </td>
                   <td className="px-5 py-3.5"><StatusBadge status={contract.status} /></td>
-                  <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => {
-                          setEditingContract(contract)
-                          setFormOpen(true)
-                        }}
-                        title="Editar contrato"
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      {contract.status !== 'CLOSED' && (
+                  {canManageContracts && (
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
-                          size="sm"
-                          onClick={() => setClosingContract(contract)}
-                          title="Encerrar contrato"
+                          size="icon-sm"
+                          onClick={() => {
+                            setEditingContract(contract)
+                            setFormOpen(true)
+                          }}
+                          title="Editar contrato"
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        {contract.status !== 'CLOSED' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setClosingContract(contract)}
+                            title="Encerrar contrato"
+                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            Encerrar
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setDeletingContract(contract)}
+                          title="Excluir contrato"
                           className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                         >
-                          Encerrar
+                          <Trash2 className="size-3.5" />
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeletingContract(contract)}
-                        title="Excluir contrato"
-                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </td>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -918,29 +940,35 @@ function ContractsPage() {
         )}
       </div>
 
-      <ContractFormDialog
-        open={formOpen}
-        onClose={() => {
-          setFormOpen(false)
-          setEditingContract(null)
-        }}
-        contract={editingContract}
-        lawyers={lawyers}
-        clients={clients}
-        cases={cases}
-      />
+      {canManageContracts && (
+        <ContractFormDialog
+          open={formOpen}
+          onClose={() => {
+            setFormOpen(false)
+            setEditingContract(null)
+          }}
+          contract={editingContract}
+          lawyers={lawyers}
+          clients={clients}
+          cases={cases}
+        />
+      )}
 
-      <CloseContractDialog
-        contract={closingContract}
-        open={!!closingContract}
-        onClose={() => setClosingContract(null)}
-      />
+      {canManageContracts && (
+        <CloseContractDialog
+          contract={closingContract}
+          open={!!closingContract}
+          onClose={() => setClosingContract(null)}
+        />
+      )}
 
-      <DeleteContractDialog
-        contract={deletingContract}
-        open={!!deletingContract}
-        onClose={() => setDeletingContract(null)}
-      />
+      {canManageContracts && (
+        <DeleteContractDialog
+          contract={deletingContract}
+          open={!!deletingContract}
+          onClose={() => setDeletingContract(null)}
+        />
+      )}
     </div>
   )
 }

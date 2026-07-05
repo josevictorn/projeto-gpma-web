@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import {
   ChevronLeft,
   ChevronRight,
@@ -41,6 +41,11 @@ import { getErrorMessage } from '@/lib/get-error-message'
 
 export const Route = createFileRoute('/_app/payment-methods/')({
   component: PaymentMethodsPage,
+  beforeLoad: ({ context }) => {
+    if (context.userRole !== 'ADMIN') {
+      throw redirect({ to: '/dashboard', search: { unauthorized: true } })
+    }
+  },
   validateSearch: z.object({
     page: z.number().int().min(1).catch(1),
     search: z.string().optional(),

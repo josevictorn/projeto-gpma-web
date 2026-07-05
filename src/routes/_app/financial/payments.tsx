@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { AlertCircle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
@@ -11,6 +11,11 @@ import { useUser } from '@/contexts/user'
 
 export const Route = createFileRoute('/_app/financial/payments')({
   component: PaymentsPage,
+  beforeLoad: ({ context }) => {
+    if (context.userRole !== 'ADMIN') {
+      throw redirect({ to: '/dashboard', search: { unauthorized: true } })
+    }
+  },
   validateSearch: z.object({
     page: z.number().int().min(1).catch(1),
     search: z.string().optional(),
@@ -46,22 +51,11 @@ function PaymentsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['financial', 'payments-status', page, search],
     queryFn: () => getContractsPaymentStatus(page, search),
-    enabled: userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER',
+    enabled: userInfo?.role === 'ADMIN',
   })
 
   const contracts = data?.results ?? []
   const meta = data?.meta
-
-  if (userInfo?.role === 'CLIENT') {
-    return (
-      <div className="p-6">
-        <h1 className="text-xl font-semibold tracking-tight">Pagamentos</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Pagamentos não estão disponíveis para seu perfil.
-        </p>
-      </div>
-    )
-  }
 
   return (
     <div className="p-6 space-y-6">

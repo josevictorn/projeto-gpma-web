@@ -137,6 +137,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const { userInfo } = useUser()
   const isAdmin = userInfo?.role === 'ADMIN'
   const isClient = userInfo?.role === 'CLIENT'
+  const isLawyer = userInfo?.role === 'LAWYER'
 
   const filteredMainNav = isClient
     ? mainNavItems.filter((item) => {
@@ -160,11 +161,26 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
         return item
       })
     : mainNavItems.filter((item) => {
-        if (userInfo?.role === 'LAWYER') {
-          return item.to !== '/leads' && item.to !== '/clients'
+        if (isLawyer) {
+          if (item.to === '/leads' || item.to === '/clients' || item.to === '/reports') {
+            return false
+          }
+
+          if (item.to === '/financial') {
+            return true
+          }
         }
 
         return true
+      }).map((item) => {
+        if (isLawyer && item.to === '/financial') {
+          return {
+            ...item,
+            children: [{ label: 'Contratos', to: '/financial/contracts' }],
+          }
+        }
+
+        return item
       })
 
   return (
