@@ -130,6 +130,10 @@ declare global {
     description: string | null
     created_by: string | null
     created_by_name: string | null
+    hearing_id: string | null
+    hearing_case_id: string | null
+    hearing_title: string | null
+    hearing_courtroom: string | null
     starts_at: string
     is_hearing: boolean
     created_at: string

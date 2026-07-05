@@ -21,6 +21,7 @@ import { createHearing } from '@/api/create-hearing'
 import { deleteAppointment } from '@/api/delete-appointment'
 import { getAppointments } from '@/api/get-appointments'
 import { getCases } from '@/api/get-cases'
+import { updateHearing } from '@/api/update-hearing'
 import { updateAppointment } from '@/api/update-appointment'
 import { Button } from '@/components/ui/button'
 import {
@@ -163,7 +164,7 @@ function CreateAppointmentDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4">
           <Field label="Título" error={errors.title?.message}>
-            <Input {...register('title')} placeholder="Ex: Audiência trabalhista" />
+            <Input {...register('title')} placeholder="Tipo de compromisso" />
           </Field>
           <Field label="Data e hora" error={errors.startsAt?.message}>
             <Input {...register('startsAt')} type="datetime-local" />
@@ -201,12 +202,15 @@ function CreateHearingDialog({
   onClose,
   defaultDate,
   cases,
+  appointment,
 }: {
   open: boolean
   onClose: () => void
   defaultDate: Date
   cases: Case[]
+  appointment?: Appointment | null
 }) {
+  const isEditing = Boolean(appointment)
   const queryClient = useQueryClient()
   const {
     register,
@@ -216,43 +220,49 @@ function CreateHearingDialog({
     formState: { errors },
   } = useForm<HearingForm>({
     resolver: zodResolver(hearingSchema),
-    defaultValues: {
-      title: '',
-      caseId: '',
-      scheduledAt: toLocalDateTimeInputValue(defaultDate),
-      courtroom: '',
-      description: '',
-    },
+    defaultValues: buildHearingDefaults(defaultDate, appointment),
   })
 
   useEffect(() => {
-    if (open) {
-      reset({
-        title: '',
-        caseId: '',
-        scheduledAt: toLocalDateTimeInputValue(defaultDate),
-        courtroom: '',
-        description: '',
-      })
+    if (!open) {
+      return
     }
-  }, [defaultDate, open, reset])
+
+    reset(buildHearingDefaults(defaultDate, appointment))
+  }, [appointment, defaultDate, open, reset])
 
   const { mutate, isPending } = useMutation({
-    mutationFn: (data: HearingForm) =>
-      createHearing({
+    mutationFn: (data: HearingForm) => {
+      const payload = {
         title: data.title,
         caseId: data.caseId,
         scheduledAt: new Date(data.scheduledAt).toISOString(),
         courtroom: data.courtroom?.trim() || undefined,
         description: data.description?.trim() || undefined,
-      }),
+      }
+
+      if (appointment) {
+        return updateHearing(appointment.id, payload)
+      }
+
+      return createHearing(payload)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] })
-      toast.success('Audiência registrada com sucesso.')
+      toast.success(
+        isEditing
+          ? 'Audiência atualizada com sucesso.'
+          : 'Audiência registrada com sucesso.'
+      )
       onClose()
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error, 'Erro ao registrar audiência.'))
+      toast.error(
+        getErrorMessage(
+          error,
+          isEditing ? 'Erro ao atualizar audiência.' : 'Erro ao registrar audiência.'
+        )
+      )
     },
   })
 
@@ -260,9 +270,11 @@ function CreateHearingDialog({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova audiência</DialogTitle>
+          <DialogTitle>{isEditing ? 'Editar audiência' : 'Nova audiência'}</DialogTitle>
           <DialogDescription>
-            Registre uma audiência para acompanhar compromissos processuais.
+            {isEditing
+              ? 'Atualize os dados da audiência selecionada.'
+              : 'Registre uma audiência para acompanhar compromissos processuais.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4">
@@ -308,7 +320,13 @@ function CreateHearingDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Salvando...' : 'Salvar audiência'}
+              {isPending
+                ? isEditing
+                  ? 'Salvando alterações...'
+                  : 'Salvando...'
+                : isEditing
+                  ? 'Salvar alterações'
+                  : 'Salvar audiência'}
             </Button>
           </DialogFooter>
         </form>
@@ -374,6 +392,7 @@ function AgendaPage() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()))
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
+  const [editingHearing, setEditingHearing] = useState<Appointment | null>(null)
   const [deletingAppointment, setDeletingAppointment] = useState<Appointment | null>(null)
 
   const month = currentMonth.getMonth() + 1
@@ -524,7 +543,7 @@ function AgendaPage() {
                   <div className="mt-3 space-y-1">
                     {items.slice(0, 2).map((item) => (
                       <p key={item.id} className="truncate text-xs text-muted-foreground">
-                        {formatTime(item.starts_at)} · {item.title}
+                        {formatTime(item.starts_at)} · {formatAgendaTitle(item)}
                       </p>
                     ))}
                     {items.length > 2 && (
@@ -577,7 +596,7 @@ function AgendaPage() {
                 <article key={appointment.id} className="space-y-3 px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-semibold">{appointment.title}</h3>
+                      <h3 className="text-sm font-semibold">{formatAgendaTitle(appointment)}</h3>
                       {appointment.description && (
                         <p className="mt-1 text-sm text-muted-foreground">
                           {appointment.description}
@@ -608,8 +627,13 @@ function AgendaPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setEditingAppointment(appointment)
-                          setDialogOpen(true)
+                          if (appointment.is_hearing) {
+                            setEditingHearing(appointment)
+                            setHearingDialogOpen(true)
+                          } else {
+                            setEditingAppointment(appointment)
+                            setDialogOpen(true)
+                          }
                         }}
                       >
                         <Pencil className="size-3.5" />
@@ -623,6 +647,11 @@ function AgendaPage() {
                           if (editingAppointment?.id === appointment.id) {
                             setEditingAppointment(null)
                             setDialogOpen(false)
+                          }
+
+                          if (editingHearing?.id === appointment.id) {
+                            setEditingHearing(null)
+                            setHearingDialogOpen(false)
                           }
 
                           setDeletingAppointment(appointment)
@@ -656,9 +685,13 @@ function AgendaPage() {
           {canCreateHearing && (
             <CreateHearingDialog
               open={hearingDialogOpen}
-              onClose={() => setHearingDialogOpen(false)}
+              onClose={() => {
+                setHearingDialogOpen(false)
+                setEditingHearing(null)
+              }}
               defaultDate={selectedDate}
               cases={cases}
+              appointment={editingHearing}
             />
           )}
 
@@ -745,6 +778,26 @@ function buildAppointmentDefaults(
   }
 }
 
+function buildHearingDefaults(date: Date, appointment?: Appointment | null): HearingForm {
+  if (appointment) {
+    return {
+      title: appointment.hearing_title ?? stripAgendaMarker(appointment.title),
+      caseId: appointment.hearing_case_id ?? '',
+      scheduledAt: toLocalDateTimeInputValue(new Date(appointment.starts_at)),
+      courtroom: appointment.hearing_courtroom ?? '',
+      description: appointment.description ?? '',
+    }
+  }
+
+  return {
+    title: '',
+    caseId: '',
+    scheduledAt: toLocalDateTimeInputValue(date),
+    courtroom: '',
+    description: '',
+  }
+}
+
 function toLocalDateTimeInputValue(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -760,4 +813,15 @@ function formatTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatAgendaTitle(appointment: Appointment) {
+  const marker = appointment.is_hearing ? 'Audiência: ' : 'Compromisso: '
+  return appointment.title.startsWith(marker)
+    ? appointment.title
+    : `${marker}${appointment.title}`
+}
+
+function stripAgendaMarker(title: string) {
+  return title.replace(/^Audi[êe]ncia:\s*/i, '').replace(/^Compromisso:\s*/i, '')
 }
