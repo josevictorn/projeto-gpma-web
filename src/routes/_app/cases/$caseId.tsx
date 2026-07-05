@@ -50,6 +50,9 @@ function CaseDetailPage() {
   })
 
   const clientName = clients?.find((client) => client.id === caseItem?.client_id)?.name
+  const visiblePrimaryName = userInfo?.role === 'CLIENT'
+    ? caseItem?.assigned_lawyer_name ?? 'Advogado não atribuído'
+    : clientName
 
   return (
     <div className="p-6 space-y-6">
@@ -89,8 +92,11 @@ function CaseDetailPage() {
             </div>
             <Separator />
             <div className="divide-y divide-border/40">
-              <InfoRow icon={User} label="Cliente">
-                {clientName ?? (
+              <InfoRow
+                icon={User}
+                label={userInfo?.role === 'CLIENT' ? 'Advogado responsável' : 'Cliente'}
+              >
+                {visiblePrimaryName ?? (
                   <span className="text-muted-foreground">{caseItem.client_id}</span>
                 )}
               </InfoRow>

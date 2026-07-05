@@ -305,6 +305,13 @@ function CasesPage() {
   const clients = userInfo?.role === 'CLIENT' ? [] : clientsData ?? []
   const lawyers = (usersData?.results ?? []).filter((user) => user.role === 'LAWYER')
   const clientNameById = new Map(clients.map((client) => [client.id, client.name]))
+  const getVisibleRelatedName = (caseItem: Case) => {
+    if (userInfo?.role === 'CLIENT') {
+      return caseItem.assigned_lawyer_name ?? 'Advogado não atribuído'
+    }
+
+    return clientNameById.get(caseItem.client_id) ?? '—'
+  }
   const canManage = userInfo?.role === 'ADMIN'
 
   function openCreate() {
@@ -361,7 +368,9 @@ function CasesPage() {
               <thead>
                 <tr className="border-b border-border/60">
                   <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Título</th>
-                  <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden md:table-cell">Cliente</th>
+                  <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden md:table-cell">
+                    {userInfo?.role === 'CLIENT' ? 'Advogado responsável' : 'Cliente'}
+                  </th>
                   <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
                   <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">Abertura</th>
                   <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Ações</th>
@@ -383,7 +392,7 @@ function CasesPage() {
                       </Link>
                     </td>
                     <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                      {clientNameById.get(caseItem.client_id) ?? '—'}
+                      {getVisibleRelatedName(caseItem)}
                     </td>
                     <td className="px-5 py-3.5">
                       <CaseStatusControl caseItem={caseItem} canEdit={canManage} />
@@ -427,7 +436,7 @@ function CasesPage() {
                       {caseItem.title}
                     </Link>
                     <p className="text-xs text-muted-foreground truncate">
-                      {clientNameById.get(caseItem.client_id) ?? '—'}
+                      {getVisibleRelatedName(caseItem)}
                     </p>
                     <div className="mt-1">
                       <CaseStatusControl caseItem={caseItem} canEdit={canManage} />

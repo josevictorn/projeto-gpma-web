@@ -66,6 +66,7 @@ declare global {
     status: CaseStatus
     client_id: string
     assigned_lawyer_id?: string | null
+    assigned_lawyer_name?: string | null
     created_at: string
     updated_at: string
   }
