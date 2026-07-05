@@ -2,6 +2,7 @@ import { api } from '@/lib/axios'
 
 export interface CreateUserBody {
   name: string
+  cpf: string
   email: string
   password: string
   role: UserRole

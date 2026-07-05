@@ -136,6 +136,10 @@ function EditRoleDialog({ user, open, onClose }: EditRoleDialogProps) {
 
 const createUserSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
+  cpf: z
+    .string()
+    .transform((value) => value.replace(/\D/g, ''))
+    .refine((value) => value.length === 11, 'CPF inválido'),
   email: z.string().email('E-mail inválido'),
   password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
   role: z.enum(['ADMIN', 'LAWYER', 'CLIENT']),
@@ -152,7 +156,7 @@ function CreateUserDialog({ open, onClose }: CreateUserDialogProps) {
   const queryClient = useQueryClient()
   const { register, handleSubmit, formState: { errors }, reset, control } = useForm<CreateUserForm>({
     resolver: zodResolver(createUserSchema),
-    defaultValues: { name: '', email: '', password: '', role: 'CLIENT' },
+    defaultValues: { name: '', cpf: '', email: '', password: '', role: 'CLIENT' },
   })
 
   const { mutate, isPending } = useMutation({
@@ -165,7 +169,7 @@ function CreateUserDialog({ open, onClose }: CreateUserDialogProps) {
     },
     onError: (error: AxiosError) => {
       if (error.response?.status === 409) {
-        toast.error('Este e-mail já está em uso.')
+        toast.error('Este CPF ou e-mail já está em uso.')
       } else {
         toast.error('Erro ao criar usuário.')
       }
@@ -193,6 +197,11 @@ function CreateUserDialog({ open, onClose }: CreateUserDialogProps) {
             <p className="text-sm font-medium">E-mail</p>
             <Input {...register('email')} type="email" placeholder="email@exemplo.com" />
             {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">CPF</p>
+            <Input {...register('cpf')} placeholder="000.000.000-00" />
+            {errors.cpf && <p className="text-xs text-destructive">{errors.cpf.message}</p>}
           </div>
           <div className="space-y-1.5">
             <p className="text-sm font-medium">Senha</p>
