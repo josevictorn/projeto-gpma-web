@@ -12,6 +12,7 @@ declare global {
 
   interface User {
     created_at: string
+    cpf?: string
     email: string
     id: string
     name: string

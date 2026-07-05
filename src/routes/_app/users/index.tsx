@@ -3,14 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import type { AxiosError } from 'axios'
 import { ChevronLeft, ChevronRight, Pencil, Plus, ShieldCheck, Trash2, UserCircle2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { createUser } from '@/api/create-user'
 import { deleteUser } from '@/api/delete-user'
 import { getUsers } from '@/api/get-users'
-import { updateUserRole } from '@/api/update-user-role'
+import { updateUser } from '@/api/update-user'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -80,54 +80,144 @@ interface EditRoleDialogProps {
 
 function EditRoleDialog({ user, open, onClose }: EditRoleDialogProps) {
   const queryClient = useQueryClient()
-  const [selectedRole, setSelectedRole] = useState<UserRole | ''>('')
+  const editUserSchema = z.object({
+    name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
+    cpf: z
+      .string()
+      .refine((value) => isValidCpf(value), 'CPF inválido. Use o formato 000.000.000-00')
+      .transform((value) => onlyDigits(value)),
+    email: z.string().email('E-mail inválido'),
+    role: z.enum(['ADMIN', 'LAWYER', 'CLIENT']),
+  })
+  type EditUserForm = z.infer<typeof editUserSchema>
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: () => updateUserRole(user!.id, { role: selectedRole as UserRole }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast.success(`Perfil de ${user?.name} atualizado com sucesso.`)
-      onClose()
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+    control,
+  } = useForm<EditUserForm>({
+    resolver: zodResolver(editUserSchema),
+    defaultValues: {
+      name: user?.name ?? '',
+      cpf: user?.cpf ? formatCpf(user.cpf) : '',
+      email: user?.email ?? '',
+      role: user?.role ?? 'CLIENT',
     },
-    onError: () => toast.error('Erro ao atualizar o perfil.'),
   })
 
+  const selectedRole = watch('role')
+
+  const hasChanges =
+    (watch('name') ?? '') !== (user?.name ?? '') ||
+    onlyDigits(watch('cpf') ?? '') !== onlyDigits(user?.cpf ?? '') ||
+    (watch('email') ?? '') !== (user?.email ?? '') ||
+    selectedRole !== user?.role
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: (data: EditUserForm) =>
+      updateUser(user!.id, {
+        name: data.name,
+        cpf: data.cpf,
+        email: data.email,
+        role: data.role,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast.success(`Dados de ${user?.name} atualizados com sucesso.`)
+      onClose()
+    },
+    onError: (error: AxiosError) => {
+      if (error.response?.status === 409) {
+        toast.error('Este CPF ou e-mail já está em uso.')
+      } else {
+        toast.error('Erro ao atualizar usuário.')
+      }
+    },
+  })
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    reset({
+      name: user?.name ?? '',
+      cpf: user?.cpf ? formatCpf(user.cpf) : '',
+      email: user?.email ?? '',
+      role: user?.role ?? 'CLIENT',
+    })
+  }, [open, user, reset])
+
   function handleOpenChange(isOpen: boolean) {
-    if (!isOpen) { setSelectedRole(''); onClose() }
+    if (!isOpen) {
+      onClose()
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar perfil</DialogTitle>
+          <DialogTitle>Editar usuário</DialogTitle>
           <DialogDescription>
-            Altere o nível de acesso de{' '}
+            Atualize os dados de{' '}
             <span className="font-medium text-foreground">{user?.name}</span>.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-1.5">
-          <p className="text-sm font-medium">Perfil de acesso</p>
-          <Select defaultValue={user?.role} onValueChange={(v) => setSelectedRole(v as UserRole)}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Selecione um perfil" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ADMIN">Administrador</SelectItem>
-              <SelectItem value="LAWYER">Advogado</SelectItem>
-              <SelectItem value="CLIENT">Cliente</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isPending}>Cancelar</Button>
-          <Button
-            onClick={() => mutate()}
-            disabled={!selectedRole || selectedRole === user?.role || isPending}
-          >
-            {isPending ? 'Salvando...' : 'Salvar'}
-          </Button>
-        </DialogFooter>
+        <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-4">
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Nome completo</p>
+            <Input {...register('name')} placeholder="Ex: João da Silva" />
+            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">E-mail</p>
+            <Input {...register('email')} type="email" placeholder="email@exemplo.com" />
+            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">CPF</p>
+            <Input
+              {...register('cpf', {
+                onChange: (event) => {
+                  event.target.value = formatCpf(event.target.value)
+                },
+              })}
+              inputMode="numeric"
+              maxLength={14}
+              placeholder="000.000.000-00"
+            />
+            {errors.cpf && <p className="text-xs text-destructive">{errors.cpf.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Perfil de acesso</p>
+            <Controller
+              name="role"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione um perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">Administrador</SelectItem>
+                    <SelectItem value="LAWYER">Advogado</SelectItem>
+                    <SelectItem value="CLIENT">Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={onClose} disabled={isPending}>Cancelar</Button>
+            <Button type="submit" disabled={!hasChanges || isPending}>
+              {isPending ? 'Salvando...' : 'Salvar alterações'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
