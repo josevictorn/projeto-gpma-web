@@ -183,7 +183,7 @@ function CreateUserDialog({ open, onClose }: CreateUserDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo usuário</DialogTitle>
           <DialogDescription>Cadastre um novo usuário no sistema.</DialogDescription>
