@@ -567,7 +567,13 @@ function AgendaPage() {
             </div>
           ) : (
             <div className="divide-y divide-border/40">
-              {selectedAppointments.map((appointment) => (
+              {selectedAppointments.map((appointment) => {
+                const canManageAppointment =
+                  canCreateAppointment &&
+                  appointment.created_by === userInfo?.id &&
+                  (userInfo?.role === 'ADMIN' || !appointment.is_hearing)
+
+                return (
                 <article key={appointment.id} className="space-y-3 px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -588,11 +594,14 @@ function AgendaPage() {
                       {new Date(appointment.starts_at).toLocaleString('pt-BR')}
                     </span>
                     <span className="inline-flex items-center gap-1.5">
+                      Cadastrado por: {appointment.created_by_name ?? 'Não informado'}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
                       <MapPin className="size-3.5" />
                       Agenda do escritório
                     </span>
                   </div>
-                  {(userInfo?.role === 'ADMIN' || !appointment.is_hearing) && canCreateAppointment && (
+                  {canManageAppointment && (
                     <div className="flex justify-end gap-2">
                       <Button
                         type="button"
@@ -625,7 +634,8 @@ function AgendaPage() {
                     </div>
                   )}
                 </article>
-              ))}
+                )
+              })}
             </div>
           )}
         </section>

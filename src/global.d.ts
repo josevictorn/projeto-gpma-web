@@ -128,6 +128,8 @@ declare global {
     id: string
     title: string
     description: string | null
+    created_by: string | null
+    created_by_name: string | null
     starts_at: string
     is_hearing: boolean
     created_at: string
