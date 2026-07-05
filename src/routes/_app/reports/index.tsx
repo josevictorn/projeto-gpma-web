@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { BarChart3, TrendingUp, Users } from 'lucide-react'
+import { BarChart3, TrendingDown, TrendingUp, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { getMonthlyAcquiredClientsReport } from '@/api/get-monthly-acquired-clients-report'
+import { getMonthlyLostLeadsReport } from '@/api/get-monthly-lost-leads-report'
 import { getMonthlyRevenueReport } from '@/api/get-monthly-revenue-report'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -152,6 +153,11 @@ function ReportsPage() {
     queryFn: () => getMonthlyRevenueReport(months),
   })
 
+  const { data: lostLeadsData, isLoading: loadingLostLeads } = useQuery({
+    queryKey: ['reports', 'leads-lost-monthly', months],
+    queryFn: () => getMonthlyLostLeadsReport(months),
+  })
+
   const clientsLastMonth = useMemo(() => {
     if (!clientsData?.points.length) {
       return null
@@ -240,6 +246,22 @@ function ReportsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Leads perdidos no período</p>
+                <p className="text-3xl font-bold tracking-tight mt-2">
+                  {loadingLostLeads ? '...' : lostLeadsData?.summary.total_leads_lost ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg p-2.5 bg-rose-500/10">
+                <TrendingDown className="size-5 text-rose-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -265,6 +287,34 @@ function ReportsPage() {
               lineColor="var(--chart-1)"
               fillGradientId="clients-line-fill"
               ariaLabel="Gráfico de clientes adquiridos por mês"
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Leads perdidos por mês</CardTitle>
+        </CardHeader>
+        <Separator />
+        <CardContent className="pt-5">
+          {loadingLostLeads ? (
+            <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">
+              Carregando relatório...
+            </div>
+          ) : (lostLeadsData?.points.length ?? 0) === 0 ? (
+            <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">
+              Sem leads perdidos para o período selecionado.
+            </div>
+          ) : (
+            <SingleLineChart
+              points={(lostLeadsData?.points ?? []).map((point) => ({
+                label: point.label,
+                value: point.total,
+              }))}
+              lineColor="var(--destructive)"
+              fillGradientId="lost-leads-line-fill"
+              ariaLabel="Gráfico de leads perdidos por mês"
             />
           )}
         </CardContent>
