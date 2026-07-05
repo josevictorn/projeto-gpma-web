@@ -3,6 +3,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { BarChart3, TrendingUp, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { getMonthlyAcquiredClientsReport } from '@/api/get-monthly-acquired-clients-report'
+import { getMonthlyRevenueReport } from '@/api/get-monthly-revenue-report'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -22,7 +23,17 @@ export const Route = createFileRoute('/_app/reports/')({
   },
 })
 
-function ReportsLineChart({ points }: { points: Array<{ label: string; total: number }> }) {
+function SingleLineChart({
+  points,
+  lineColor,
+  fillGradientId,
+  ariaLabel,
+}: {
+  points: Array<{ label: string; value: number }>
+  lineColor: string
+  fillGradientId: string
+  ariaLabel: string
+}) {
   const width = 900
   const height = 320
   const paddingTop = 24
@@ -31,12 +42,12 @@ function ReportsLineChart({ points }: { points: Array<{ label: string; total: nu
   const paddingRight = 24
   const innerWidth = width - paddingLeft - paddingRight
   const innerHeight = height - paddingTop - paddingBottom
-  const maxValue = Math.max(...points.map((point) => point.total), 1)
+  const maxValue = Math.max(...points.map((point) => point.value), 1)
   const stepX = points.length > 1 ? innerWidth / (points.length - 1) : innerWidth
 
   const chartPoints = points.map((point, index) => {
     const x = paddingLeft + index * stepX
-    const y = paddingTop + innerHeight - (point.total / maxValue) * innerHeight
+    const y = paddingTop + innerHeight - (point.value / maxValue) * innerHeight
     return { ...point, x, y }
   })
 
@@ -53,12 +64,12 @@ function ReportsLineChart({ points }: { points: Array<{ label: string; total: nu
         viewBox={`0 0 ${width} ${height}`}
         className="min-w-[680px] w-full h-[320px]"
         role="img"
-        aria-label="Gráfico de clientes adquiridos por mês"
+        aria-label={ariaLabel}
       >
         <defs>
-          <linearGradient id="line-fill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.32" />
-            <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0.02" />
+          <linearGradient id={fillGradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={lineColor} stopOpacity="0.32" />
+            <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
           </linearGradient>
         </defs>
 
@@ -87,27 +98,27 @@ function ReportsLineChart({ points }: { points: Array<{ label: string; total: nu
         {chartPoints.length > 1 && (
           <polygon
             points={`${paddingLeft},${paddingTop + innerHeight} ${polylinePoints} ${paddingLeft + innerWidth},${paddingTop + innerHeight}`}
-            fill="url(#line-fill)"
+            fill={`url(#${fillGradientId})`}
           />
         )}
 
         <polyline
           points={polylinePoints}
           fill="none"
-          stroke="var(--chart-1)"
+          stroke={lineColor}
           strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
 
         {chartPoints.map((point, index) => (
-          <g key={`${point.label}-${point.total}`}>
+          <g key={`${point.label}-${point.value}`}>
             <circle
               cx={point.x}
               cy={point.y}
               r="4"
               fill="var(--background)"
-              stroke="var(--chart-1)"
+              stroke={lineColor}
               strokeWidth="2"
             />
             {(index === 0 || index === chartPoints.length - 1 || index % 2 === 0) && (
@@ -131,18 +142,23 @@ function ReportsLineChart({ points }: { points: Array<{ label: string; total: nu
 function ReportsPage() {
   const [months, setMonths] = useState(12)
 
-  const { data, isLoading } = useQuery({
+  const { data: clientsData, isLoading: loadingClients } = useQuery({
     queryKey: ['reports', 'clients-acquired-monthly', months],
     queryFn: () => getMonthlyAcquiredClientsReport(months),
   })
 
-  const lastMonth = useMemo(() => {
-    if (!data?.points.length) {
+  const { data: revenueData, isLoading: loadingRevenue } = useQuery({
+    queryKey: ['reports', 'revenue-monthly', months],
+    queryFn: () => getMonthlyRevenueReport(months),
+  })
+
+  const clientsLastMonth = useMemo(() => {
+    if (!clientsData?.points.length) {
       return null
     }
 
-    return data.points[data.points.length - 1]
-  }, [data])
+    return clientsData.points[clientsData.points.length - 1]
+  }, [clientsData])
 
   return (
     <div className="p-6 space-y-6">
@@ -150,7 +166,7 @@ function ReportsPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Relatórios</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Evolução mensal de clientes adquiridos (conversão de lead e cadastro direto).
+            Acompanhe aquisição de clientes e faturamento mensal do escritório.
           </p>
         </div>
 
@@ -176,7 +192,7 @@ function ReportsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Clientes no período</p>
                 <p className="text-3xl font-bold tracking-tight mt-2">
-                  {isLoading ? '...' : data?.summary.total_clients_acquired ?? 0}
+                  {loadingClients ? '...' : clientsData?.summary.total_clients_acquired ?? 0}
                 </p>
               </div>
               <div className="rounded-lg p-2.5 bg-emerald-500/10">
@@ -190,9 +206,11 @@ function ReportsPage() {
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Média mensal</p>
+                <p className="text-sm text-muted-foreground">Faturamento previsto</p>
                 <p className="text-3xl font-bold tracking-tight mt-2">
-                  {isLoading ? '...' : (data?.summary.average_per_month ?? 0).toFixed(1)}
+                  {loadingRevenue
+                    ? '...'
+                    : formatCurrencyBRL(revenueData?.summary.total_expected ?? 0)}
                 </p>
               </div>
               <div className="rounded-lg p-2.5 bg-blue-500/10">
@@ -206,12 +224,14 @@ function ReportsPage() {
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pico mensal</p>
+                <p className="text-sm text-muted-foreground">Recebido no período</p>
                 <p className="text-3xl font-bold tracking-tight mt-2">
-                  {isLoading ? '...' : data?.summary.peak.total ?? 0}
+                  {loadingRevenue
+                    ? '...'
+                    : formatCurrencyBRL(revenueData?.summary.total_received ?? 0)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {isLoading ? '' : data?.summary.peak.label}
+                  Em aberto: {formatCurrencyBRL(revenueData?.summary.total_outstanding ?? 0)}
                 </p>
               </div>
               <div className="rounded-lg p-2.5 bg-amber-500/10">
@@ -228,26 +248,69 @@ function ReportsPage() {
         </CardHeader>
         <Separator />
         <CardContent className="pt-5">
-          {isLoading ? (
+          {loadingClients ? (
             <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">
               Carregando relatório...
             </div>
-          ) : (data?.points.length ?? 0) === 0 ? (
+          ) : (clientsData?.points.length ?? 0) === 0 ? (
             <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">
               Sem dados para o período selecionado.
             </div>
           ) : (
-            <ReportsLineChart points={data?.points ?? []} />
+            <SingleLineChart
+              points={(clientsData?.points ?? []).map((point) => ({
+                label: point.label,
+                value: point.total,
+              }))}
+              lineColor="var(--chart-1)"
+              fillGradientId="clients-line-fill"
+              ariaLabel="Gráfico de clientes adquiridos por mês"
+            />
           )}
         </CardContent>
       </Card>
 
-      {lastMonth && (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Faturamento mensal (previsto)</CardTitle>
+        </CardHeader>
+        <Separator />
+        <CardContent className="pt-5">
+          {loadingRevenue ? (
+            <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">
+              Carregando relatório...
+            </div>
+          ) : (revenueData?.points.length ?? 0) === 0 ? (
+            <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">
+              Sem dados financeiros para o período selecionado.
+            </div>
+          ) : (
+            <SingleLineChart
+              points={(revenueData?.points ?? []).map((point) => ({
+                label: point.label,
+                value: point.expected,
+              }))}
+              lineColor="var(--chart-2)"
+              fillGradientId="revenue-line-fill"
+              ariaLabel="Gráfico de faturamento mensal previsto"
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {clientsLastMonth && (
         <p className="text-xs text-muted-foreground">
-          Último mês ({lastMonth.label}): <span className="font-medium text-foreground">{lastMonth.total}</span>{' '}
-          cliente(s) adquirido(s).
+          Último mês ({clientsLastMonth.label}):{' '}
+          <span className="font-medium text-foreground">{clientsLastMonth.total}</span> cliente(s) adquirido(s).
         </p>
       )}
     </div>
   )
+}
+
+function formatCurrencyBRL(value: number) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value)
 }

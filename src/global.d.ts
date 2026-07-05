@@ -99,6 +99,7 @@ declare global {
   }
 
   type ContractFeeType = 'FIXED' | 'HOURLY' | 'SUCCESS' | 'MIXED'
+  type ContractBillingType = 'ONE_TIME' | 'MONTHLY' | 'INSTALLMENTS'
   type ContractStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED'
 
   interface Contract {
@@ -112,6 +113,12 @@ declare global {
     fee_type: ContractFeeType
     fee_value: number
     payment_terms: string
+    billing_type: ContractBillingType
+    installments: number
+    first_due_date: string
+    grace_days: number
+    late_fee_percent: number
+    interest_percent_monthly: number
     status: ContractStatus
     created_at: string
     updated_at: string

@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import {
   createContract,
+  type ContractBillingType,
   type ContractFeeType,
   type ContractStatus,
 } from '@/api/create-contract'
@@ -67,6 +68,12 @@ const feeTypeLabel: Record<ContractFeeType, string> = {
   MIXED: 'Misto',
 }
 
+const billingTypeLabel: Record<ContractBillingType, string> = {
+  ONE_TIME: 'Pagamento único',
+  MONTHLY: 'Mensal',
+  INSTALLMENTS: 'Parcelado',
+}
+
 function StatusBadge({ status }: { status: ContractStatus }) {
   const className =
     status === 'ACTIVE'
@@ -95,7 +102,29 @@ const contractSchema = z.object({
     .finite('Informe um valor válido de honorários.')
     .positive('Informe valor maior que zero.'),
   paymentTerms: z.string().min(1, 'Condição de pagamento é obrigatória'),
+  billingType: z.enum(['ONE_TIME', 'MONTHLY', 'INSTALLMENTS']),
+  installments: z.number().int().positive('Quantidade de parcelas inválida'),
+  firstDueDate: z.string().min(1, 'Primeiro vencimento é obrigatório'),
+  graceDays: z.number().int().min(0, 'Carência inválida'),
+  lateFeePercent: z.number().min(0, 'Multa inválida'),
+  interestPercentMonthly: z.number().min(0, 'Juros inválidos'),
   status: z.enum(['DRAFT', 'ACTIVE', 'CLOSED']),
+}).superRefine((data, ctx) => {
+  if (data.billingType === 'INSTALLMENTS' && data.installments < 2) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['installments'],
+      message: 'Para parcelado, informe ao menos 2 parcelas.',
+    })
+  }
+
+  if (data.billingType === 'ONE_TIME' && data.installments !== 1) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['installments'],
+      message: 'Para pagamento único, a quantidade deve ser 1.',
+    })
+  }
 })
 
 type ContractForm = z.infer<typeof contractSchema>
@@ -110,6 +139,12 @@ const emptyContract: ContractForm = {
   feeType: 'FIXED',
   feeValue: 0,
   paymentTerms: '',
+  billingType: 'MONTHLY',
+  installments: 12,
+  firstDueDate: '',
+  graceDays: 5,
+  lateFeePercent: 2,
+  interestPercentMonthly: 1,
   status: 'ACTIVE',
 }
 
@@ -130,8 +165,21 @@ function contractToForm(contract: Contract): ContractForm {
     feeType: contract.fee_type,
     feeValue: contract.fee_value,
     paymentTerms: contract.payment_terms,
+    billingType: contract.billing_type,
+    installments: contract.installments,
+    firstDueDate: toDateInputValue(new Date(contract.first_due_date)),
+    graceDays: contract.grace_days,
+    lateFeePercent: contract.late_fee_percent,
+    interestPercentMonthly: contract.interest_percent_monthly,
     status: contract.status,
   }
+}
+
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function Field({
@@ -221,6 +269,12 @@ function ContractFormDialog({
         feeType: data.feeType,
         feeValue: data.feeValue,
         paymentTerms: data.paymentTerms,
+        billingType: data.billingType,
+        installments: data.installments,
+        firstDueDate: new Date(data.firstDueDate).toISOString(),
+        graceDays: data.graceDays,
+        lateFeePercent: data.lateFeePercent,
+        interestPercentMonthly: data.interestPercentMonthly,
         status: data.status,
       }
 
@@ -401,6 +455,83 @@ function ContractFormDialog({
                 )}
               />
             </Field>
+            <Field label="Modelo de cobrança" error={errors.billingType?.message}>
+              <Controller
+                name="billingType"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(billingTypeLabel).map((billingType) => (
+                        <SelectItem key={billingType} value={billingType}>
+                          {billingTypeLabel[billingType as ContractBillingType]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Parcelas" error={errors.installments?.message}>
+              <Input
+                {...register('installments', {
+                  setValueAs: (value) => {
+                    const parsed = Number(value)
+                    return Number.isFinite(parsed) ? parsed : Number.NaN
+                  },
+                })}
+                type="number"
+                min="1"
+                step="1"
+              />
+            </Field>
+            <Field label="Primeiro vencimento" error={errors.firstDueDate?.message}>
+              <Input {...register('firstDueDate')} type="date" />
+            </Field>
+            <Field label="Carência (dias)" error={errors.graceDays?.message}>
+              <Input
+                {...register('graceDays', {
+                  setValueAs: (value) => {
+                    const parsed = Number(value)
+                    return Number.isFinite(parsed) ? parsed : Number.NaN
+                  },
+                })}
+                type="number"
+                min="0"
+                step="1"
+              />
+            </Field>
+            <Field label="Multa (%)" error={errors.lateFeePercent?.message}>
+              <Input
+                {...register('lateFeePercent', {
+                  setValueAs: (value) => {
+                    const normalized = String(value).replace(',', '.')
+                    const parsed = Number(normalized)
+                    return Number.isFinite(parsed) ? parsed : Number.NaN
+                  },
+                })}
+                type="number"
+                min="0"
+                step="0.01"
+              />
+            </Field>
+            <Field label="Juros ao mês (%)" error={errors.interestPercentMonthly?.message}>
+              <Input
+                {...register('interestPercentMonthly', {
+                  setValueAs: (value) => {
+                    const normalized = String(value).replace(',', '.')
+                    const parsed = Number(normalized)
+                    return Number.isFinite(parsed) ? parsed : Number.NaN
+                  },
+                })}
+                type="number"
+                min="0"
+                step="0.01"
+              />
+            </Field>
           </div>
 
           <Field label="Objeto do contrato" error={errors.serviceDescription?.message}>
@@ -413,7 +544,7 @@ function ContractFormDialog({
           </Field>
 
           <Field label="Condição de pagamento" error={errors.paymentTerms?.message}>
-            <Input {...register('paymentTerms')} placeholder="Ex: 30% entrada + 3 parcelas mensais" />
+            <Input {...register('paymentTerms')} placeholder="Ex: 30% entrada + restante em 3 parcelas" />
           </Field>
 
           <DialogFooter>
