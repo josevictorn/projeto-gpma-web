@@ -644,6 +644,7 @@ function ContractsPage() {
   const navigate = useNavigate()
   const { userInfo } = useUser()
   const isAdmin = userInfo?.role === 'ADMIN'
+  const showLawyerInfo = isAdmin
   const canViewContracts = userInfo?.role === 'ADMIN' || userInfo?.role === 'LAWYER'
   const canManageContracts = isAdmin
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
@@ -817,7 +818,9 @@ function ContractsPage() {
               <tr className="border-b border-border/60">
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Número</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden md:table-cell">Cliente</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">Advogado</th>
+                {showLawyerInfo && (
+                  <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">Advogado</th>
+                )}
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground hidden xl:table-cell">Caso</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Honorário</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
@@ -836,9 +839,11 @@ function ContractsPage() {
                   <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
                     {clientMap.get(contract.client_id) ?? contract.client_id}
                   </td>
-                  <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">
-                    {lawyerMap.get(contract.lawyer_id) ?? contract.lawyer_id}
-                  </td>
+                  {showLawyerInfo && (
+                    <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">
+                      {lawyerMap.get(contract.lawyer_id) ?? contract.lawyer_id}
+                    </td>
+                  )}
                   <td className="px-5 py-3.5 text-muted-foreground hidden xl:table-cell">
                     {caseMap.get(contract.case_id) ?? contract.case_id}
                   </td>
