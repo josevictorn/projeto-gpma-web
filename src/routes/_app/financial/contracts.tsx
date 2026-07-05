@@ -97,8 +97,6 @@ function StatusBadge({ status }: { status: ContractStatus }) {
 
 const contractSchema = z.object({
   contractNumber: z.string().min(1, 'Número do contrato é obrigatório'),
-  lawyerId: z.string().uuid('Advogado é obrigatório'),
-  clientId: z.string().uuid('Cliente é obrigatório'),
   caseId: z.string().uuid('Caso é obrigatório'),
   signedAt: z.string().min(1, 'Data de assinatura é obrigatória'),
   serviceDescription: z.string().min(1, 'Objeto do contrato é obrigatório'),
@@ -137,8 +135,6 @@ type ContractForm = z.infer<typeof contractSchema>
 
 const emptyContract: ContractForm = {
   contractNumber: '',
-  lawyerId: '',
-  clientId: '',
   caseId: '',
   signedAt: '',
   serviceDescription: '',
@@ -163,8 +159,6 @@ function contractToForm(contract: Contract): ContractForm {
 
   return {
     contractNumber: contract.contract_number,
-    lawyerId: contract.lawyer_id,
-    clientId: contract.client_id,
     caseId: contract.case_id,
     signedAt: `${year}-${month}-${day}`,
     serviceDescription: contract.service_description,
@@ -243,12 +237,18 @@ function ContractFormDialog({
     }
   }, [contract, open, reset])
 
-  const selectedClientId = watch('clientId')
+  const selectedCaseId = watch('caseId')
   const selectedPaymentMethod = watch('paymentTerms')
-  const availableCases = useMemo(
-    () => cases.filter((item) => item.client_id === selectedClientId),
-    [cases, selectedClientId]
+  const selectedCase = useMemo(
+    () => cases.find((item) => item.id === selectedCaseId),
+    [cases, selectedCaseId]
   )
+  const selectedCaseLawyerName = selectedCase?.assigned_lawyer_id
+    ? (lawyers.find((lawyer) => lawyer.id === selectedCase.assigned_lawyer_id)?.name ?? '—')
+    : 'Não atribuído'
+  const selectedCaseClientName = selectedCase?.client_id
+    ? (clients.find((client) => client.id === selectedCase.client_id)?.name ?? '—')
+    : '—'
   const activePaymentMethods = useMemo(
     () => paymentMethods.filter((method) => method.is_active),
     [paymentMethods]
@@ -257,28 +257,10 @@ function ContractFormDialog({
     (method) => method.name === selectedPaymentMethod
   )
 
-  useEffect(() => {
-    if (!selectedClientId) {
-      return
-    }
-
-    const currentCaseId = watch('caseId')
-    const validCase = availableCases.some((item) => item.id === currentCaseId)
-
-    if (!validCase) {
-      reset({
-        ...watch(),
-        caseId: '',
-      })
-    }
-  }, [availableCases, reset, selectedClientId, watch])
-
   const { mutate, isPending } = useMutation({
     mutationFn: (data: ContractForm) => {
       const payload = {
         contractNumber: data.contractNumber,
-        lawyerId: data.lawyerId,
-        clientId: data.clientId,
         caseId: data.caseId,
         signedAt: new Date(data.signedAt).toISOString(),
         serviceDescription: data.serviceDescription,
@@ -347,46 +329,6 @@ function ContractFormDialog({
             <Field label="Data de assinatura" error={errors.signedAt?.message}>
               <Input {...register('signedAt')} type="date" />
             </Field>
-            <Field label="Advogado associado" error={errors.lawyerId?.message}>
-              <Controller
-                name="lawyerId"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {lawyers.map((lawyer) => (
-                        <SelectItem key={lawyer.id} value={lawyer.id}>
-                          {lawyer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
-            <Field label="Cliente" error={errors.clientId?.message}>
-              <Controller
-                name="clientId"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
             <Field label="Caso" error={errors.caseId?.message}>
               <Controller
                 name="caseId"
@@ -397,7 +339,7 @@ function ContractFormDialog({
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableCases.map((legalCase) => (
+                      {cases.map((legalCase) => (
                         <SelectItem key={legalCase.id} value={legalCase.id}>
                           {legalCase.title}
                         </SelectItem>
@@ -406,6 +348,12 @@ function ContractFormDialog({
                   </Select>
                 )}
               />
+            </Field>
+            <Field label="Cliente vinculado ao caso">
+              <Input value={selectedCaseClientName} readOnly />
+            </Field>
+            <Field label="Advogado vinculado ao caso">
+              <Input value={selectedCaseLawyerName} readOnly />
             </Field>
             <Field label="Tipo de honorário" error={errors.feeType?.message}>
               <Controller

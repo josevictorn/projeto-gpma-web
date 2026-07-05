@@ -6,8 +6,6 @@ export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED'
 
 export interface CreateContractBody {
   contractNumber: string
-  lawyerId: string
-  clientId: string
   caseId: string
   signedAt: string
   serviceDescription: string
