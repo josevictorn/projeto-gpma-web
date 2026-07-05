@@ -591,6 +591,9 @@ function AgendaPage() {
                   canCreateAppointment &&
                   appointment.created_by === userInfo?.id &&
                   (userInfo?.role === 'ADMIN' || !appointment.is_hearing)
+                const hearingLocation = appointment.is_hearing
+                  ? appointment.hearing_courtroom?.trim() ?? ''
+                  : ''
 
                 return (
                 <article key={appointment.id} className="space-y-3 px-5 py-4">
@@ -617,7 +620,7 @@ function AgendaPage() {
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <MapPin className="size-3.5" />
-                      Agenda do escritório
+                      {hearingLocation}
                     </span>
                   </div>
                   {canManageAppointment && (

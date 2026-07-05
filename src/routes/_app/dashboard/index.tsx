@@ -5,6 +5,7 @@ import {
   Briefcase,
   Calendar,
   Clock,
+  MapPin,
   UserCheck,
   Users,
 } from 'lucide-react'
@@ -88,7 +89,7 @@ function DashboardPage() {
         .map((appointment) => ({
           id: appointment.id,
           title: appointment.title,
-          description: appointment.description,
+          location: appointment.hearing_courtroom?.trim() ?? '',
           startsAt: new Date(appointment.starts_at),
         }))
         .filter((appointment) => appointment.startsAt.getTime() >= now.getTime())
@@ -97,14 +98,12 @@ function DashboardPage() {
         .map((appointment) => ({
           id: appointment.id,
           title: appointment.title,
-          description: appointment.description,
+          location: appointment.location,
           time: appointment.startsAt.toLocaleTimeString('pt-BR', {
             hour: '2-digit',
             minute: '2-digit',
           }),
-          date: sameDay(appointment.startsAt, now)
-            ? 'Hoje'
-            : appointment.startsAt.toLocaleDateString('pt-BR'),
+          date: appointment.startsAt.toLocaleDateString('pt-BR'),
           urgent: sameDay(appointment.startsAt, now),
         }))
     : []
@@ -307,19 +306,22 @@ function DashboardPage() {
                       </span>
                     ) : (
                       <span className="shrink-0 text-[10px] text-muted-foreground">
-                        {hearing.date}
+                        Próxima
                       </span>
                     )}
                   </div>
-                  {hearing.description && (
-                    <p className="text-[11px] text-muted-foreground mb-2 line-clamp-2">
-                      {hearing.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="size-3" />
+                      {hearing.date}
+                    </span>
                     <span className="flex items-center gap-1">
                       <Clock className="size-3" />
                       {hearing.time}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3" />
+                      {hearing.location}
                     </span>
                   </div>
                 </div>
