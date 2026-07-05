@@ -214,6 +214,9 @@ function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
     mutationFn: async (data: LeadForm) => {
       if (isEditing && data.status === 'CONTRACTED') {
         return convertLeadToClient(lead.id, {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
           maritalStatus: data.maritalStatus ?? '',
           profession: data.profession ?? '',
           cpf: data.cpf ?? '',

@@ -1,6 +1,9 @@
 import { api } from '@/lib/axios'
 
 export interface ConvertLeadToClientBody {
+  name: string
+  email: string
+  phone: string
   maritalStatus: string
   profession: string
   cpf: string
