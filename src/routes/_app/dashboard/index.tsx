@@ -75,14 +75,16 @@ function DashboardPage() {
     enabled: canSeeAgenda,
   })
 
+  const hearings = appointments.filter((appointment) => appointment.is_hearing)
+
   const clientNameById = new Map((clientsData?.results ?? []).map((c) => [c.id, c.name]))
   const recentCases = (casesData?.results ?? []).slice(0, 5)
-  const appointmentsToday = appointments.filter((appointment) =>
+  const hearingsToday = hearings.filter((appointment) =>
     sameDay(new Date(appointment.starts_at), now)
   ).length
 
   const displayedHearings = canSeeAgenda
-    ? appointments
+    ? hearings
         .map((appointment) => ({
           id: appointment.id,
           title: appointment.title,
@@ -143,8 +145,8 @@ function DashboardPage() {
     },
     {
       label: 'Audiências Hoje',
-      value: canSeeAgenda ? String(appointmentsToday) : '—',
-      hint: canSeeAgenda ? 'Compromissos na agenda' : 'Indisponível para o perfil',
+      value: canSeeAgenda ? String(hearingsToday) : '—',
+      hint: canSeeAgenda ? 'Audiências marcadas na agenda' : 'Indisponível para o perfil',
       icon: Calendar,
       color: 'text-violet-500',
       bg: 'bg-violet-500/10',
